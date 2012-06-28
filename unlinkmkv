@@ -14,6 +14,11 @@
 # is that very few players/filters/splitters support this, so this script automates the mkvtoolnix tools
 # to "Rebuild" each episode into "complete" MKVs.
 #
+# Right now the tool is very rudamentary, in that it takes exactly one argument -- the MKV file to process.
+# Currently it WILL create temporary files in the same directory as the MKV being processed, and those files
+# will -roughly- take the same space as the original MKV. It also does NOT replace the original file, it creates
+# a new one with .REBUILT.mkv replacing the old extension. So while the script is working, it'll require at
+# least the (original file size) x 2 in free space to account for both the temporary and new files.
 
 use strict;
 use warnings;

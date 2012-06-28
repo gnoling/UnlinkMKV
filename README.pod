@@ -1,0 +1,77 @@
+=head1 NAME
+
+unlinkmkv - automate the tedious process of unlinking segmented MKV files
+
+=head2 WHAT?
+
+A segmented MKV is an MKV that utilizes external additional MKV files to create a "whole" MKV. A common example is that when a TV series uses the same introduction and ending in every episode, sometimes the encoder will break the introduction and ending into their own MKV files, and then "link" to the segments as chapters in each episode's individual MKV. The problem is that very few players/filters/splitters support this, so this script automates the mkvtoolnix tools to "Rebuild" each episode into "complete" MKVs.
+
+=head2 VERSION
+
+version 0.01
+
+=head2 SYNOPSIS
+
+Using UnlinkMKV to unlink segmented chapters, the chapters when viewing the video ARE retained. The MKV spec requires that the segmented files are in the same directory, so does this. It doesn't matter if you rename the files as long as all required files are in the same directory as the one being processed, segmenting is based on internal IDs.
+
+Say we have the files:
+
+   princess-ressurection-ep-1.mkv
+   princess-ressurection-clean-opening.mkv
+   princess-ressurection-clean-ending.mkv
+
+And "princess-ressurection-ep-1.mkv" links the opening and ending files in the "appropriate places."
+
+   unlinkmkv princess-ressurection-ep-1.mkv
+
+Doing so will generate a new file with the opening and ending built-in instead of externally linked like before. Obviously the new file will be the size of the original + opening + ending (bigger). Afterwards, we get:
+
+   princess-ressurection-ep-1.REBUILT.mkv
+
+==head2 INSTALLATION
+
+This script was made for use on linux, and has only been tested on LMDE (Debian), but should work on any linux (and maybe OSX?) setup that meets the required dependencies. Currently, it very definitely will not work on Windows without modification. As long as you meet the dependencies, there really is nothing to install. Just run unlinkmkv from where-ever.
+
+==head2 DEPENDENCIES
+
+This script requires:
+
+   Perl        >= 5.8.9
+   MKVToolnix  >= 5.1.0
+   XML::LibXML >= 2.0001
+
+On LMDE, you should be able to "sudo apt-get update && sudo apt-get install mkvtoolnix libxml-libxml-perl".
+
+==head2 USAGE
+
+   unlinkmkv file.mkv
+
+==head2 SUPPORT
+
+Feel free to contact me via Github or by email at g.unlinkmkv -at- idiotb.us.
+
+==head2 COPYRIGHT AND LICENSE
+
+Copyright (C) 2012 Garret Noling
+
+This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+
+# <rant>I keep trying to think of something clever to put here referencing the anime communities douchability.
+# On one hand, people push for 10-bit h264 since any modern computer can handle it fine, and everyone else
+# can just f**k off. On the other hand, the community also pushes for douche moves like using segment linking
+# that only specific filters/splitters support, just to presumably save a (relatively) small amount of disk
+# space. I say, how can one afford a decent computer and not a decent hard drive? The hard drives are waaay
+# cheaper.</rant>
+#
+# This script automates the tedious process of unlinking segmented MKV files. A segmented MKV is an MKV that
+# utilizes external additional MKV to create a "whole" MKV. A common example is that when a TV series uses the
+# same introduction and ending in every episode, sometimes the encoder will break the introduction and ending
+# into their own MKV files, and "link" to the segments as chapters in each episode's individual MKV. The problem
+# is that very few players/filters/splitters support this, so this script automates the mkvtoolnix tools
+# to "Rebuild" each episode into "complete" MKVs.
+#
+# Right now the tool is very rudamentary, in that it takes exactly one argument -- the MKV file to process.
+# Currently it WILL create temporary files in the same directory as the MKV being processed, and those files
+# will -roughly- take the same space as the original MKV. It also does NOT replace the original file, it creates
+# a new one with .REBUILT.mkv replacing the old extension. So while the script is working, it'll require at
+# least the (original file size) x 2 in free space to account for both the temporary and new files.

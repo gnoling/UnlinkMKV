@@ -1,0 +1,155 @@
+#!/usr/bin/env perl
+# unlinkmkv - Because de-douche was too on the nose.
+# I keep trying to think of something clever to put here referencing the anime communities douchability.
+# On one hand, people push for 10-bit h264 since any modern computer can handle it fine, and everyone else
+# can just f**k off. On the other hand, the community also pushes for douche moves like using segment linking
+# that only specific filters/splitters support, just to presumably save a (relatively) small amount of disk
+# space. I say, how can one afford a decent computer and not a decent hard drive? The hard drives are waaay
+# cheaper.
+
+use strict;
+use warnings;
+use XML::LibXML;
+use File::Basename;
+use Cwd            qw/realpath/;
+use File::Glob     qw/:globally :nocase/;
+use Math::BigFloat qw/:constant/;
+
+    my $mkvext    = qx(which mkvextract | xargs echo -n);
+    my $mkvinfo   = qx(which mkvinfo    | xargs echo -n);
+    my $mkvmerge  = qx(which mkvmerge   | xargs echo -n);
+    my $xmlparser = XML::LibXML->new();
+    my $xml;
+    my (@segments, @splits);
+    my($parent, $dir, $suffix) = fileparse($ARGV[0], qr/\.[mM][kK][vV]/);
+    $dir = realpath($dir);
+
+    open my $H, '-|', $mkvext, 'chapters', $dir . '/' . $parent . $suffix;
+    binmode $H;
+    $xml = $xmlparser->load_xml(IO => $H);
+    close $H;
+
+    my $offs_time_end            = '00:00:00.000000000';
+    my $last_time_end            = '00:00:00.000000000';
+    my $offset                   = '00:00:00.000000000';
+    foreach my $chapter ($xml->findnodes('//ChapterAtom')) {
+	my ($ChapterTimeStart) = $chapter->findnodes('./ChapterTimeStart/text()');
+	my ($ChapterTimeEnd)   = $chapter->findnodes('./ChapterTimeEnd/text()');
+	if($chapter->exists('ChapterSegmentUID') && $chapter->findvalue('ChapterFlagEnabled') == 1) {
+	    my ($SegmentUID, $SegmentUIDText);
+	    ($SegmentUID)   = $chapter->findnodes('./ChapterSegmentUID/text()');
+	    $SegmentUIDText = $SegmentUID->textContent();
+	    $SegmentUIDText =~ s/\n//g;
+	    $SegmentUIDText =~ s/\s//g;
+	    $SegmentUIDText =~ s/([a-zA-Z0-9]{2})/ 0x$1/g;
+	    $SegmentUIDText =~ s/^\s//;
+	    push @segments, {
+		start       => $ChapterTimeStart->textContent(),
+		stop        => $ChapterTimeEnd->textContent(),
+		id          => $SegmentUIDText,
+		split_start => $last_time_end
+	    };
+	    push @splits, $last_time_end unless $last_time_end eq '00:00:00.000000000';
+	    $chapter->removeChild($chapter->findnodes('./ChapterSegmentUID'));
+	    $offset = add_duration_to_timecode($offset, $ChapterTimeEnd->textContent());
+	    $ChapterTimeStart->setData($offs_time_end);
+	    $ChapterTimeEnd->setData(add_duration_to_timecode($offs_time_end, $ChapterTimeEnd->textContent()));
+	}
+	else {
+	    push @segments, {
+		file        => $dir . '/' . $parent . $suffix,
+		start       => $ChapterTimeStart->textContent(),
+		stop        => $ChapterTimeEnd->textContent(),
+		split_start => $ChapterTimeStart->textContent(),
+		split_stop  => $ChapterTimeEnd->textContent()
+	    };
+	    $last_time_end = $ChapterTimeEnd->textContent();
+	    $ChapterTimeStart->setData(add_duration_to_timecode($ChapterTimeStart->textContent(), $offset));
+	    $ChapterTimeEnd->setData(add_duration_to_timecode($ChapterTimeEnd->textContent(),     $offset));
+	    $offs_time_end = $ChapterTimeEnd->textContent();
+	}
+    }
+
+    open my $out_chapters, '>', $dir . '/unlinkmkv-temp-chapters.xml';
+    print {$out_chapters} $xml->toString;
+    close $out_chapters;
+
+    chdir($dir);
+    foreach my $file (<*.mkv>) {
+	next if $file eq "$dir/$parent$suffix";
+	my ($id, $dur) = mkvinfo($file);
+	for (@segments) {
+	    next unless defined $_->{id};
+	    if($_->{id} eq $id) {
+		$_->{file} = $file;
+	    }
+	}
+    }
+
+    system($mkvmerge, '--no-chapters', '-o', $dir . '/unlinkmkv-temp-%03d.mkv', $dir . '/' . $parent . $suffix, '--split', 'timecodes:' . join(',',@splits)) unless scalar(@splits) == 0;
+
+    my @parts;
+    my $LAST  = '';
+    my $count = 1;
+    foreach my $segment (@segments) {
+	if(defined $segment->{id} && $segment->{start} eq '00:00:00.000000000' || ($LAST ne $segment->{file} && scalar(@splits) == 0)) {
+	    push @parts, '+';
+	    push @parts, $segment->{file};
+	}
+	elsif($LAST ne $segment->{file}) {
+	    push @parts, '+';
+	    push @parts, sprintf("$dir/unlinkmkv-temp-%03d.mkv",$count);
+	    $count++;
+	}
+	$LAST = $segment->{file};
+    }
+
+    (undef) = shift @parts;
+    system($mkvmerge, '--no-chapters', '--chapters', $dir . '/unlinkmkv-temp-chapters.xml', '-o', $dir . '/' . $parent . '.REBUILT' . $suffix, @parts);
+
+    for(@parts) {
+	system('rm','-f',$_) if $_ =~ /unlinkmkv-temp-/;
+    }
+    system('rm','-f','unlinkmkv-temp-chapters.xml');
+
+    sub mkvinfo {
+	my $file = shift;
+	open my $H, '-|', $mkvinfo, $file;
+	my $id  = '';
+	my $dur = '';
+	while(<$H>) {
+	    chomp;
+	    if ($_ =~ /Segment UID:/) {
+		$_ =~ /Segment UID:([a-zA-Z0-9\s]+)$/;
+		$id = $1;
+		$id =~ s/^\s+//g;
+		$id =~ s/\s+$//g;
+	    }
+	    elsif($_ =~ /^\| \+ Duration:/) {
+		$_   =~ /^\| \+ Duration:.*\((.*)\)/;
+		$dur = $1;
+	    }
+	}
+	close $H;
+	return ($id, $dur);
+    }
+
+    sub add_duration_to_timecode {
+	my $time = shift;
+	my $dur  = shift;
+	my ($th, $tm, $ts) = split /:/,  $time;
+	my ($dh, $dm, $ds) = split /:/,  $dur;
+
+	$ts += $ds;
+	if($ts >= 60.000000000) {
+	    $ts = $ts - 60.000000000;
+	    $dm++;
+	}
+	$tm += $dm;
+	if($tm >= 60) {
+	    $tm = $tm - 60;
+	    $dh++;
+	}
+	$th += $dh;
+	return sprintf("%02d:%02d:%02.9f",$th,$tm,$ts);
+    }

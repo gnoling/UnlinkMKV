@@ -1,6 +1,6 @@
 =head1 NAME
 
-unlinkmkv - automate the tedious process of unlinking segmented MKV files
+unlinkmkv - automate the tedious process of unlinking segmented MKV files, some people also refer to this as "undoing ordered chapters" or "re-merge ordered chapters."
 
 =head2 WHAT?
 

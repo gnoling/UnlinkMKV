@@ -6,6 +6,14 @@
 # that only specific filters/splitters support, just to presumably save a (relatively) small amount of disk
 # space. I say, how can one afford a decent computer and not a decent hard drive? The hard drives are waaay
 # cheaper.
+#
+# This script automates the tedious process of unlinking segmented MKV files. A segmented MKV is an MKV that
+# utilizes external additional MKV to create a "whole" MKV. A common example is that when a TV series uses the
+# same introduction and ending in every episode, sometimes the encoder will break the introduction and ending
+# into their own MKV files, and "link" to the segments as chapters in each episode's individual MKV. The problem
+# is that very few players/filters/splitters support this, so this script automates the mkvtoolnix tools
+# to "Rebuild" each episode into "complete" MKVs.
+#
 
 use strict;
 use warnings;

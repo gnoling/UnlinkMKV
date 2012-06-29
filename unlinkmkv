@@ -30,13 +30,20 @@ use Math::BigFloat qw/:constant/;
 	my ($ChapterTimeStart) = $chapter->findnodes('./ChapterTimeStart/text()');
 	my ($ChapterTimeEnd)   = $chapter->findnodes('./ChapterTimeEnd/text()');
 	if($chapter->exists('ChapterSegmentUID') && $chapter->findvalue('ChapterFlagEnabled') == 1) {
-	    my ($SegmentUID, $SegmentUIDText);
+	    my ($SegmentUID, $SegmentELE, $SegmentUIDText);
+	    ($SegmentELE)   = $chapter->findnodes('./ChapterSegmentUID');
 	    ($SegmentUID)   = $chapter->findnodes('./ChapterSegmentUID/text()');
 	    $SegmentUIDText = $SegmentUID->textContent();
-	    $SegmentUIDText =~ s/\n//g;
-	    $SegmentUIDText =~ s/\s//g;
-	    $SegmentUIDText =~ s/([a-zA-Z0-9]{2})/ 0x$1/g;
-	    $SegmentUIDText =~ s/^\s//;
+	    if($SegmentELE->getAttribute('format') eq 'hex') {
+		$SegmentUIDText =~ s/\n//g;
+		$SegmentUIDText =~ s/\s//g;
+		$SegmentUIDText =~ s/([a-zA-Z0-9]{2})/ 0x$1/g;
+		$SegmentUIDText =~ s/^\s//;
+	    }
+	    elsif($SegmentELE->getAttribute('format') eq 'ascii') {
+		$SegmentUIDText =~ s/(.)/sprintf("0x%x ",ord($1))/eg;
+		$SegmentUIDText =~ s/\s$//;
+	    }
 	    push @segments, {
 		start       => $ChapterTimeStart->textContent(),
 		stop        => $ChapterTimeEnd->textContent(),
@@ -100,6 +107,9 @@ use Math::BigFloat qw/:constant/;
 
     (undef) = shift @parts;
     system($mkvmerge, '--no-chapters', '--chapters', $dir . '/unlinkmkv-temp-chapters.xml', '-o', $dir . '/' . $parent . '.REBUILT' . $suffix, @parts);
+
+    system('/bin/mv', $dir . '/' . $parent . $suffix, $dir . '/' . $parent . $suffix . '.old-unlinkmkv');
+    system('/bin/mv', $dir . '/' . $parent . '.REBUILT' . $suffix, $dir . '/' . $parent . $suffix);
 
     for(@parts) {
 	system('rm','-f',$_) if $_ =~ /unlinkmkv-temp-/;

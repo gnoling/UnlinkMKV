@@ -29,12 +29,12 @@ Doing so will generate a new file with the opening and ending built-in instead o
    princess-ressurection-ep-1.REBUILT.mkv
 
 
-==head2 INSTALLATION
+=head2 INSTALLATION
 
 This script was made for use on linux, and has only been tested on LMDE (Debian), but should work on any linux (and maybe OSX?) setup that meets the required dependencies. Currently, it very definitely will not work on Windows without modification. As long as you meet the dependencies, there really is nothing to install. Just run unlinkmkv from where-ever.
 
 
-==head2 DEPENDENCIES
+=head2 DEPENDENCIES
 
 This script requires:
 
@@ -45,17 +45,17 @@ This script requires:
 On LMDE, you should be able to "sudo apt-get update && sudo apt-get install mkvtoolnix libxml-libxml-perl".
 
 
-==head2 USAGE
+=head2 USAGE
 
    unlinkmkv file.mkv
 
 
-==head2 SUPPORT
+=head2 SUPPORT
 
 Feel free to contact me via Github or by email at g.unlinkmkv -at- idiotb.us.
 
 
-==head2 COPYRIGHT AND LICENSE
+=head2 COPYRIGHT AND LICENSE
 
 Copyright (C) 2012 Garret Noling
 

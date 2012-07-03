@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 # unlinkmkv - Because de-douche was too on the nose.
 
+require 5.010;
 use strict;
 use warnings;
 use XML::LibXML;
@@ -27,138 +28,168 @@ use Getopt::Long;
 	"toolpath"       => \$toolpath
     );
 
-    print "please specify a file\n"                      and exit(0) if !defined $ARGV[0];
-    print "specified file does not appear to be valid\n" and exit(0) if !-s      $ARGV[0];
+    print "please specify a file or directory\n"                      and exit(0) if !defined $ARGV[0];
+    print "specified file or directory does not appear to be valid\n" and exit(0) unless (-s $ARGV[0] || -d $ARGV[0]);
 
-    my($parent, $dir, $suffix) = fileparse($ARGV[0], qr/\.[mM][kK][vV]/);
-    $dir                       = realpath($dir);
-    $file                      = "$dir/$parent$suffix";
-    $tmpdir                    = (defined $tmpdir) ? $tmpdir: '/tmp';
-    $outfile                 //= "$parent.REBUILT$suffix";
-    $toolpath                  =~ s/\/?$/\//;
-    $tmpdir                    =~ s/\/$//;
-
-    if($outfile =~ /\//) {
-	my($f, $d, $s) = fileparse($ARGV[0], qr/\.[mM][kK][vV]/);
-	$d = realpath($dir);
-	if(-d $d) {
-	    $outfile = "$d/$outfile";
-	}
-	else {
-	    print "unable to resolve path for outfile, please either use an absolute path or just the filename";
-	    exit;
-	}
-    }
-    else {
-	$outfile = "$dir/$outfile";
-    }
-
+    $toolpath     =~ s/\/?$/\//;
     my $mkvext    = $toolpath . 'mkvextract';
     my $mkvinfo   = $toolpath . 'mkvinfo';
     my $mkvmerge  = $toolpath . 'mkvmerge';
     my $xmlparser = XML::LibXML->new();
-    my $xml;
-    my @segments;
-    my @splits;
-    my @cleanuplist;
+    $tmpdir       = (defined $tmpdir) ? $tmpdir: '/tmp';
+    $tmpdir       =~ s/\/$//;
 
-    open my $H, '-|', $mkvext, 'chapters', $file;
-    binmode $H;
-    $xml = $xmlparser->load_xml(IO => $H);
-    close $H;
+    if(-f $ARGV[0]) {
+	process_file($ARGV[0]);
+    }
+    elsif(-d $ARGV[0]) {
+	my $segfiles;
+	my $work_dir = realpath($ARGV[0]);
+	opendir(my $dh, $work_dir) || die "failed to open directory $!";
+	while(my $file = readdir $dh) {
+	    open my $FH, '-|', $mkvext, 'chapters', $file;
+	    while(my $line = <$FH>) {
+		if($line =~ /<ChapterSegmentUID/) {
+		    $segfiles->{$file} = 1;
+		}
+	    }
+	    close $FH;
+	}
+	closedir($dh);
+	chdir($work_dir);
+	foreach my $file (sort keys %$segfiles) {
+	    print "SEGMENTED $work_dir/$file\n";
+	    process_file($file, $outfile);
+	}
+    }
+    exit(0);
 
-    my $offs_time_end            = '00:00:00.000000000';
-    my $last_time_end            = '00:00:00.000000000';
-    my $offset                   = '00:00:00.000000000';
-    foreach my $chapter ($xml->findnodes('//ChapterAtom')) {
-	my ($ChapterTimeStart) = $chapter->findnodes('./ChapterTimeStart/text()');
-	my ($ChapterTimeEnd)   = $chapter->findnodes('./ChapterTimeEnd/text()');
-	if($chapter->exists('ChapterSegmentUID') && $chapter->findvalue('ChapterFlagEnabled') == 1) {
-	    my ($SegmentUID, $SegmentELE, $SegmentUIDText);
-	    ($SegmentELE)   = $chapter->findnodes('./ChapterSegmentUID');
-	    ($SegmentUID)   = $chapter->findnodes('./ChapterSegmentUID/text()');
-	    $SegmentUIDText = $SegmentUID->textContent();
-	    if($SegmentELE->getAttribute('format') eq 'hex') {
-		$SegmentUIDText =~ s/\n//g;
-		$SegmentUIDText =~ s/\s//g;
-		$SegmentUIDText =~ s/([a-zA-Z0-9]{2})/ 0x$1/g;
-		$SegmentUIDText =~ s/^\s//;
+    sub process_file {
+	my $arg_file = shift;
+	my $outfile  = shift;
+	my($parent, $dir, $suffix) = fileparse($arg_file, qr/\.[mM][kK][vV]/);
+	$dir                       = realpath($dir);
+	$file                      = "$dir/$parent$suffix";
+	$outfile                 //= "$parent.REBUILT$suffix";
+
+	if($outfile =~ /\//) {
+	    my($f, $d, $s) = fileparse($arg_file, qr/\.[mM][kK][vV]/);
+	    $d = realpath($dir);
+	    if(-d $d) {
+		$outfile = "$d/$outfile";
 	    }
-	    elsif($SegmentELE->getAttribute('format') eq 'ascii') {
-		$SegmentUIDText =~ s/(.)/sprintf("0x%x ",ord($1))/eg;
-		$SegmentUIDText =~ s/\s$//;
+	    else {
+		print "unable to resolve path for outfile, please either use an absolute path or just the filename";
+		exit;
 	    }
-	    push @segments, {
-		start       => $ChapterTimeStart->textContent(),
-		stop        => $ChapterTimeEnd->textContent(),
-		id          => $SegmentUIDText,
-		split_start => $last_time_end
-	    };
-	    push @splits, $last_time_end unless $last_time_end eq '00:00:00.000000000';
-	    $chapter->removeChild($chapter->findnodes('./ChapterSegmentUID'));
-	    $offset = add_duration_to_timecode($offset, $ChapterTimeEnd->textContent());
-	    $ChapterTimeStart->setData($offs_time_end);
-	    $ChapterTimeEnd->setData(add_duration_to_timecode($offs_time_end, $ChapterTimeEnd->textContent()));
 	}
 	else {
-	    push @segments, {
-		file        => $dir . '/' . $parent . $suffix,
-		start       => $ChapterTimeStart->textContent(),
-		stop        => $ChapterTimeEnd->textContent(),
-		split_start => $ChapterTimeStart->textContent(),
-		split_stop  => $ChapterTimeEnd->textContent()
-	    };
-	    $last_time_end = $ChapterTimeEnd->textContent();
-	    $ChapterTimeStart->setData(add_duration_to_timecode($ChapterTimeStart->textContent(), $offset));
-	    $ChapterTimeEnd->setData(add_duration_to_timecode($ChapterTimeEnd->textContent(),     $offset));
-	    $offs_time_end = $ChapterTimeEnd->textContent();
+	    $outfile = "$dir/$outfile";
 	}
-    }
 
-    open my $out_chapters, '>', $tmpdir . "/$parent-chapters.xml";
-    print {$out_chapters} $xml->toString;
-    close $out_chapters;
-    push @cleanuplist, $tmpdir . "/$parent-chapters.xml";
+	my $xml;
+	my @segments;
+	my @splits;
+	my @cleanuplist;
 
-    chdir($dir);
-    foreach my $mkv (<*.mkv>) {
-	$mkv = "$dir/$mkv";
-	next if $mkv eq $file;
-	my ($id, $dur) = mkvinfo($mkv);
-	for (@segments) {
-	    next unless defined $_->{id};
-	    if($_->{id} eq $id) {
-		$_->{file} = $mkv;
+	open my $H, '-|', $mkvext, 'chapters', $file;
+	binmode $H;
+	$xml = $xmlparser->load_xml(IO => $H);
+	close $H;
+
+	my $offs_time_end            = '00:00:00.000000000';
+	my $last_time_end            = '00:00:00.000000000';
+	my $offset                   = '00:00:00.000000000';
+	foreach my $chapter ($xml->findnodes('//ChapterAtom')) {
+	    my ($ChapterTimeStart) = $chapter->findnodes('./ChapterTimeStart/text()');
+	    my ($ChapterTimeEnd)   = $chapter->findnodes('./ChapterTimeEnd/text()');
+	    if($chapter->exists('ChapterSegmentUID') && $chapter->findvalue('ChapterFlagEnabled') == 1) {
+		my ($SegmentUID, $SegmentELE, $SegmentUIDText);
+		($SegmentELE)   = $chapter->findnodes('./ChapterSegmentUID');
+		($SegmentUID)   = $chapter->findnodes('./ChapterSegmentUID/text()');
+		$SegmentUIDText = $SegmentUID->textContent();
+		if($SegmentELE->getAttribute('format') eq 'hex') {
+		    $SegmentUIDText =~ s/\n//g;
+		    $SegmentUIDText =~ s/\s//g;
+		    $SegmentUIDText =~ s/([a-zA-Z0-9]{2})/ 0x$1/g;
+		    $SegmentUIDText =~ s/^\s//;
+		}
+		elsif($SegmentELE->getAttribute('format') eq 'ascii') {
+		    $SegmentUIDText =~ s/(.)/sprintf("0x%x ",ord($1))/eg;
+		    $SegmentUIDText =~ s/\s$//;
+		}
+		push @segments, {
+		    start       => $ChapterTimeStart->textContent(),
+		    stop        => $ChapterTimeEnd->textContent(),
+		    id          => $SegmentUIDText,
+		    split_start => $last_time_end
+		};
+		push @splits, $last_time_end unless $last_time_end eq '00:00:00.000000000';
+		$chapter->removeChild($chapter->findnodes('./ChapterSegmentUID'));
+		$offset = add_duration_to_timecode($offset, $ChapterTimeEnd->textContent());
+		$ChapterTimeStart->setData($offs_time_end);
+		$ChapterTimeEnd->setData(add_duration_to_timecode($offs_time_end, $ChapterTimeEnd->textContent()));
+	    }
+	    else {
+		push @segments, {
+		    file        => $dir . '/' . $parent . $suffix,
+		    start       => $ChapterTimeStart->textContent(),
+		    stop        => $ChapterTimeEnd->textContent(),
+		    split_start => $ChapterTimeStart->textContent(),
+		    split_stop  => $ChapterTimeEnd->textContent()
+		};
+		$last_time_end = $ChapterTimeEnd->textContent();
+		$ChapterTimeStart->setData(add_duration_to_timecode($ChapterTimeStart->textContent(), $offset));
+		$ChapterTimeEnd->setData(add_duration_to_timecode($ChapterTimeEnd->textContent(),     $offset));
+		$offs_time_end = $ChapterTimeEnd->textContent();
 	    }
 	}
-    }
 
-    system($mkvmerge, '--no-chapters', '-o', "$tmpdir/$parent-unlinkmkv-%03d.mkv", $file, '--split', 'timecodes:' . join(',',@splits)) unless scalar(@splits) == 0;
+	open my $out_chapters, '>', $tmpdir . "/$parent-chapters.xml";
+	print {$out_chapters} $xml->toString;
+	close $out_chapters;
+	push @cleanuplist, $tmpdir . "/$parent-chapters.xml";
 
-    my @parts;
-    my $LAST  = '';
-    my $count = 1;
-    foreach my $segment (@segments) {
-	if(defined $segment->{id} && $segment->{start} eq '00:00:00.000000000' || ($LAST ne $segment->{file} && scalar(@splits) == 0)) {
-	    push @parts, '+';
-	    push @parts, $segment->{file};
+	chdir($dir);
+	foreach my $mkv (<*.mkv>) {
+	    $mkv = "$dir/$mkv";
+	    next if $mkv eq $file;
+	    my ($id, $dur) = mkvinfo($mkv);
+	    for (@segments) {
+		next unless defined $_->{id};
+		if($_->{id} eq $id) {
+		    $_->{file} = $mkv;
+		}
+	    }
 	}
-	elsif($LAST ne $segment->{file}) {
-	    push @parts,       '+';
-	    push @parts,       sprintf("$tmpdir/$parent-unlinkmkv-%03d.mkv",$count);
-	    push @cleanuplist, sprintf("$tmpdir/$parent-unlinkmkv-%03d.mkv",$count);
-	    $count++;
+
+	system($mkvmerge, '--no-chapters', '-o', "$tmpdir/$parent-unlinkmkv-%03d.mkv", $file, '--split', 'timecodes:' . join(',',@splits)) unless scalar(@splits) == 0;
+
+	my @parts;
+	my $LAST  = '';
+	my $count = 1;
+	foreach my $segment (@segments) {
+	    if(defined $segment->{id} && $segment->{start} eq '00:00:00.000000000' || ($LAST ne $segment->{file} && scalar(@splits) == 0)) {
+		push @parts, '+';
+		push @parts, $segment->{file};
+	    }
+	    elsif($LAST ne $segment->{file}) {
+		push @parts,       '+';
+		push @parts,       sprintf("$tmpdir/$parent-unlinkmkv-%03d.mkv",$count);
+		push @cleanuplist, sprintf("$tmpdir/$parent-unlinkmkv-%03d.mkv",$count);
+		$count++;
+	    }
+	    $LAST = $segment->{file};
 	}
-	$LAST = $segment->{file};
-    }
-    (undef) = shift @parts;
+	(undef) = shift @parts;
 
-    system($mkvmerge, '--no-chapters', '--chapters', "$tmpdir/$parent-chapters.xml", '-o', $outfile, @parts);
-    system('/bin/mv',       $file,   "$file.unlinkmkv") if $rename;
-    system('/bin/mv', '-f', $outfile, $file)            if $replace;
+	system($mkvmerge, '--no-chapters', '--chapters', "$tmpdir/$parent-chapters.xml", '-o', $outfile, @parts);
+	system('/bin/mv',       $file,   "$file.unlinkmkv") if $rename;
+	system('/bin/mv', '-f', $outfile, $file)            if $replace;
 
-    if(!$keeptempfiles) {
-	system('rm','-f',$_) for (@cleanuplist);
+	if(!$keeptempfiles) {
+	    system('rm','-f',$_) for (@cleanuplist);
+	}
     }
 
     sub mkvinfo {

@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # unlinkmkv - Because de-douche was too on the nose.
 
 require 5.010;

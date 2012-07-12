@@ -58,7 +58,6 @@ use Getopt::Long;
 	closedir($dh);
 	chdir($work_dir);
 	foreach my $file (sort keys %$segfiles) {
-	    print "SEGMENTED $work_dir/$file\n";
 	    process_file($file, $outfile);
 	}
     }
@@ -91,6 +90,8 @@ use Getopt::Long;
 	my @segments;
 	my @splits;
 	my @cleanuplist;
+
+	print "processing $parent$suffix\n";
 
 	open my $H, '-|', $mkvext, 'chapters', $file;
 	binmode $H;
@@ -163,7 +164,33 @@ use Getopt::Long;
 	    }
 	}
 
-	system($mkvmerge, '--no-chapters', '-o', "$tmpdir/$parent-unlinkmkv-%03d.mkv", $file, '--split', 'timecodes:' . join(',',@splits)) unless scalar(@splits) == 0;
+	my $okay_to_proceed = 1;
+	for (@segments) {
+	    if(defined $_->{id} && !defined $_->{file}) {
+		printf("\t%-15s: %s\n","missing segment", $_->{id});
+		$okay_to_proceed = 0;
+	    }
+	    elsif(defined $_->{id} && defined $_->{file}) {
+		printf("\t%15s: %s\n","found segment", $_->{file});
+	    }
+	}
+	if(!$okay_to_proceed) {
+	    cleanup(@cleanuplist);
+	    return 0;
+	}
+
+	if(scalar(@splits) > 0) {
+	    my @mergeout;
+	    printf("\t%15s: %s\n","splitting file", $file) unless scalar(@splits) == 0;
+	    open my $M, '-|', $mkvmerge, '--no-chapters', '-o', "$tmpdir/$parent-unlinkmkv-%03d.mkv", $file, '--split', 'timecodes:' . join(',',@splits);
+	    while(<$M>) {
+		print;
+		chomp;
+		push @mergeout, $_;
+	    }
+	    #system($mkvmerge, '--no-chapters', '-o', "$tmpdir/$parent-unlinkmkv-%03d.mkv", $file, '--split', 'timecodes:' . join(',',@splits)) unless scalar(@splits) == 0;
+	    close $M;
+	}
 
 	my @parts;
 	my $LAST  = '';
@@ -183,12 +210,31 @@ use Getopt::Long;
 	}
 	(undef) = shift @parts;
 
-	system($mkvmerge, '--no-chapters', '--chapters', "$tmpdir/$parent-chapters.xml", '-o', $outfile, @parts);
-	system('/bin/mv',       $file,   "$file.unlinkmkv") if $rename;
-	system('/bin/mv', '-f', $outfile, $file)            if $replace;
+	my @mergeout;
+	printf("\t%15s: %s\n","building file", $outfile);
+	open my $MERGE, '-|', $mkvmerge, '--no-chapters', '--chapters', "$tmpdir/$parent-chapters.xml", '-o', $outfile, @parts;
+	while(<$MERGE>) {
+	    print;
+	    chomp;
+	    push @mergeout, $MERGE;
+	}
+	close $MERGE;
+	#system($mkvmerge, '--no-chapters', '--chapters', "$tmpdir/$parent-chapters.xml", '-o', $outfile, @parts);
+	printf("\t%15s: %s\n","move source to", "$file.unlinkmkv") if $rename;
+	system('/bin/mv',       $file,   "$file.unlinkmkv")        if $rename;
+	printf("\t%15s: %s\n","save final as", $file)              if $replace;
+	system('/bin/mv', '-f', $outfile, $file)                   if $replace;
 
+	cleanup(@cleanuplist);
+    }
+
+    sub cleanup {
+	my (@cleanuplist) = @_;
 	if(!$keeptempfiles) {
-	    system('rm','-f',$_) for (@cleanuplist);
+	    for (@cleanuplist) {
+		printf("\t%15s: %s\n", 'removing', $_);
+		system('rm','-f',$_);
+	    }
 	}
     }
 

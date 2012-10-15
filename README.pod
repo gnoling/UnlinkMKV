@@ -1,10 +1,10 @@
 =head1 NAME
 
-unlinkmkv - automate the tedious process of unlinking segmented MKV files, some people also refer to this as "undoing ordered chapters" or "re-merge ordered chapters."
+unlinkmkv - automate the tedious process of unlinking segmented MKV files.
 
 =head2 WHAT?
 
-A segmented MKV is an MKV that utilizes external additional MKV files to create a "whole" MKV. A common example is that when a TV series uses the same introduction and ending in every episode, sometimes the encoder will break the introduction and ending into their own MKV files, and then "link" to the segments as chapters in each episode's individual MKV. The problem is that very few players/filters/splitters support this, so this script automates the mkvtoolnix tools to "Rebuild" each episode into "complete" MKVs.
+A segmented MKV is an MKV that utilizes external additional MKV files to create a "whole" MKV. A common example is that when an anime series uses the same introduction and ending in every episode, sometimes the encoder will break the introduction and ending into their own MKV files, and then "link" to the segments as chapters in each episode's individual MKV. The problem is that very few players/filters/splitters support this, so this script automates the mkvtoolnix tools to "Rebuild" each episode into "complete" MKVs.
 
 =head2 VERSION
 
@@ -12,7 +12,7 @@ version 0.01
 
 =head2 SYNOPSIS
 
-Using UnlinkMKV to unlink segmented chapters, the chapters when viewing the video ARE retained. The MKV spec requires that the segmented files are in the same directory, so does this. It doesn't matter if you rename the files as long as all required files are in the same directory as the one being processed, segmenting is based on internal IDs.
+Using UnlinkMKV to unlink segments, the chapters when viewing the video ARE retained. The MKV spec requires that the segmented files are in the same directory, so does this. It doesn't matter if you rename the files as long as all required files are in the same directory as the one being processed, segmenting is based on internal IDs.
 
 Say we have the files:
 
@@ -22,12 +22,24 @@ Say we have the files:
 
 And "princess-ressurection-ep-1.mkv" links the opening and ending files in the "appropriate places."
 
-   unlinkmkv princess-ressurection-ep-1.mkv
+   unlinkmkv --rename --replace princess-ressurection-ep-1.mkv
 
-Doing so will generate a new file with the opening and ending built-in instead of externally linked like before. Obviously the new file will be the size of the original + opening + ending (bigger). Afterwards, we get:
+Doing so will generate a new file with the opening and ending built-in instead of externally linked like before, renaming the original file and replacing the old one with the new one. Obviously the new file will be the size of the original + opening + ending (bigger). Afterwards, we get:
 
-   princess-ressurection-ep-1.REBUILT.mkv
+   princess-ressurection-ep-1.mkv           <-- now contains both the opening and ending
+   princess-ressurection-ep-1.mkv.unlinkmkv <-- original file
 
+You can also use an absolute or relative path instead, so, assume you're in a directory containing the entire seeson of an anime including the segmented file parts:
+
+   princess-ressurection-ep-1.mkv
+   princess-ressurection-ep-2.mkv
+   princess-ressurection-ep-3.mkv
+   princess-ressurection-clean-opening.mkv
+   princess-ressurection-clean-ending.mk
+
+You could process them all at once with:
+
+   unlinkmkv --rename --replace .
 
 =head2 INSTALLATION
 
@@ -47,8 +59,16 @@ On LMDE, you should be able to "sudo apt-get update && sudo apt-get install mkvt
 
 =head2 USAGE
 
-   unlinkmkv file.mkv
+   unlinkmkv {options} {file|path}
 
+   Options:
+   --tmpdir         Set a custom temporary/working folder, /tmp is the default
+   --out            Custom output filename, optional
+   --rename         Appends ".unlinkmkv" to the unoriginal unmodified file's name
+   --replace        When completed, forcibly moves the new file over the original file's name. If you don't combine this with --rename, then it will REPLACE the original file!
+   --keeptempfiles  Don't clean up temporary files, which include the broken apart segments and extracted chapter data
+   --toolpath       Path for mkvtoolnix tools
+   --verbose        Increase verbosity on what the script is doing, mostly related to external command output
 
 =head2 SUPPORT
 

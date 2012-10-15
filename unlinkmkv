@@ -24,7 +24,7 @@ use Getopt::Long;
     GetOptions (
 	"tmpdir=s"       => \$tmpdir,
 	"o|out=s"        => \$outfile,
-	"rename-old!"    => \$rename,
+	"rename!"        => \$rename,
 	"replace!"       => \$replace,
 	"keeptempfiles!" => \$keeptempfiles,
 	"toolpath"       => \$toolpath,

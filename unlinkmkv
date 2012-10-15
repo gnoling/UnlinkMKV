@@ -17,7 +17,9 @@ use Getopt::Long;
     my $rename        = 0;
     my $replace       = 0;
     my $keeptempfiles = 0;
+    my $verbose       = 0;
     my $toolpath      = "/usr/bin";
+    my $ffmpeg        = "/opt/ffmpeg/bin/ffmpeg";
 
     GetOptions (
 	"tmpdir=s"       => \$tmpdir,
@@ -25,7 +27,8 @@ use Getopt::Long;
 	"rename-old!"    => \$rename,
 	"replace!"       => \$replace,
 	"keeptempfiles!" => \$keeptempfiles,
-	"toolpath"       => \$toolpath
+	"toolpath"       => \$toolpath,
+	"verbose|v"      => \$verbose,
     );
 
     print "please specify a file or directory\n"                      and exit(0) if !defined $ARGV[0];
@@ -132,6 +135,7 @@ use Getopt::Long;
 		$ChapterTimeEnd->setData(add_duration_to_timecode($offs_time_end, $ChapterTimeEnd->textContent()));
 	    }
 	    else {
+		eval { if(defined $ChapterTimeEnd->textContent() && defined $ChapterTimeStart->textContent()){}; 1 } or next;
 		push @segments, {
 		    file        => $dir . '/' . $parent . $suffix,
 		    start       => $ChapterTimeStart->textContent(),
@@ -184,11 +188,10 @@ use Getopt::Long;
 	    printf("\t%15s: %s\n","splitting file", $file) unless scalar(@splits) == 0;
 	    open my $M, '-|', $mkvmerge, '--no-chapters', '-o', "$tmpdir/$parent-unlinkmkv-%03d.mkv", $file, '--split', 'timecodes:' . join(',',@splits);
 	    while(<$M>) {
-		print;
+		print if $verbose;
 		chomp;
 		push @mergeout, $_;
 	    }
-	    #system($mkvmerge, '--no-chapters', '-o', "$tmpdir/$parent-unlinkmkv-%03d.mkv", $file, '--split', 'timecodes:' . join(',',@splits)) unless scalar(@splits) == 0;
 	    close $M;
 	}
 
@@ -214,12 +217,12 @@ use Getopt::Long;
 	printf("\t%15s: %s\n","building file", $outfile);
 	open my $MERGE, '-|', $mkvmerge, '--no-chapters', '--chapters', "$tmpdir/$parent-chapters.xml", '-o', $outfile, @parts;
 	while(<$MERGE>) {
-	    print;
+	    print if $verbose;
 	    chomp;
 	    push @mergeout, $MERGE;
 	}
 	close $MERGE;
-	#system($mkvmerge, '--no-chapters', '--chapters', "$tmpdir/$parent-chapters.xml", '-o', $outfile, @parts);
+
 	printf("\t%15s: %s\n","move source to", "$file.unlinkmkv") if $rename;
 	system('/bin/mv',       $file,   "$file.unlinkmkv")        if $rename;
 	printf("\t%15s: %s\n","save final as", $file)              if $replace;

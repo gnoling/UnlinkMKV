@@ -8,11 +8,11 @@ A segmented MKV is an MKV that utilizes external additional MKV files to create 
 
 =head2 VERSION
 
-version 0.01
+version 1.00
 
 =head2 SYNOPSIS
 
-Using UnlinkMKV to unlink segments, the chapters when viewing the video ARE retained. The MKV spec requires that the segmented files are in the same directory, so does this. It doesn't matter if you rename the files as long as all required files are in the same directory as the one being processed, segmenting is based on internal IDs.
+Using UnlinkMKV to unlink segments, the chapters when viewing the video ARE retained. The MKV spec requires that the segmented files are in the same directory, so does this. It doesn't matter if you rename the files as long as all required files are in the same directory as the one being processed, segmenting is based on internal IDs. Depending on how the original files were made, you may need to use the fix-audio and fix-video options.
 
 Say we have the files:
 
@@ -22,12 +22,16 @@ Say we have the files:
 
 And "princess-ressurection-ep-1.mkv" links the opening and ending files in the "appropriate places."
 
-   unlinkmkv --rename --replace princess-ressurection-ep-1.mkv
+   unlinkmkv --outdir "/home/user/Desktop/Princess Ressurection" princess-ressurection-ep-1.mkv
 
-Doing so will generate a new file with the opening and ending built-in instead of externally linked like before, renaming the original file and replacing the old one with the new one. Obviously the new file will be the size of the original + opening + ending (bigger). Afterwards, we get:
+Doing so will generate a new file with the opening and ending built-in instead of externally linked like before, renaming the original file and replacing the old one with the new one. Obviously the new file will be the size of the original + opening + ending (bigger).
 
-   princess-ressurection-ep-1.mkv           <-- now contains both the opening and ending
-   princess-ressurection-ep-1.mkv.unlinkmkv <-- original file
+Now, we test the file in a video player. It's important to check for audio or video problems, especially when transitioning between where the segments would have come in. Often times this is the opening/ending and the main show, so seek inside both places and make sure sound is playing in both places, and the video looks fine. Let's
+pretend our sound is totally missing in the main video, and the video is corrupt!
+
+   unlinkmkv --fix-audio --fix-video --outdir "/home/user/Desktop/Princess Ressurection" princess-ressurection-ep-1.mkv
+
+What happens is sometimes encoders use codecs that don't play well with matroska, and can't be assembled as they were -- either the codec (OGG) or the settings (thanks, encoder guy) being the cause. The fix-audio and fix-video option simply re-encodes the audio and video into a uniform format that plays nice, with settings that try to not reduce the quality very much (not noticable), nor make the files hugemassive. See the FFMPEG notes!
 
 You can also use an absolute or relative path instead, so, assume you're in a directory containing the entire seeson of an anime including the segmented file parts:
 
@@ -39,12 +43,15 @@ You can also use an absolute or relative path instead, so, assume you're in a di
 
 You could process them all at once with:
 
-   unlinkmkv --rename --replace .
+   unlinkmkv --fix-audio --fix-video --outdir "/home/user/Desktop/Princess Ressurection" "/home/user/videos/Princess Resurrection"
 
 =head2 INSTALLATION
 
-This script was made for use on linux, and has only been tested on LMDE (Debian), but should work on any linux (and maybe OSX?) setup that meets the required dependencies. Currently, it very definitely will not work on Windows without modification. As long as you meet the dependencies, there really is nothing to install. Just run unlinkmkv from where-ever.
+This script was made for use on linux, and has only been tested on LMDE (Debian), but should work on any linux (and maybe OSX?) setup that meets the required dependencies.
+Currently, it very definitely will not work on Windows without modification. You need to install perl, a handful of perl modules (the ones in the use's at the top of the script),
+and a REAL and RECENT version of ffmpeg (see dependency note -- you'll know if its the libav fork if it tells you to use avconv when running it) if you want to fix the audio or video.
 
+Also, the paths are hard coded in the script currently, but all of them are near the top. Change them to suite your system!
 
 =head2 DEPENDENCIES
 
@@ -53,22 +60,23 @@ This script requires:
    Perl        >= 5.8.9
    MKVToolnix  >= 5.1.0
    XML::LibXML >= 2.0001
-
-On LMDE, you should be able to "sudo apt-get update && sudo apt-get install mkvtoolnix libxml-libxml-perl".
-
+   Quite a few more perl modules
+   FFMPEG      == *real* version of ffmpeg. Recent versions of Ubuntu and Debian come with a prominent ffmpeg fork called libav, which is *not* fully compatible.
+   Hard drive space, if your temp directory is small, set it to someplace else -- especially if using fix audio or fix video!
 
 =head2 USAGE
 
    unlinkmkv {options} {file|path}
 
    Options:
-   --tmpdir         Set a custom temporary/working folder, /tmp is the default
-   --out            Custom output filename, optional
-   --rename         Appends ".unlinkmkv" to the unoriginal unmodified file's name
-   --replace        When completed, forcibly moves the new file over the original file's name. If you don't combine this with --rename, then it will REPLACE the original file!
-   --keeptempfiles  Don't clean up temporary files, which include the broken apart segments and extracted chapter data
-   --toolpath       Path for mkvtoolnix tools
-   --verbose        Increase verbosity on what the script is doing, mostly related to external command output
+   --tmpdir         Set a custom temporary/working folder, /tmp/umkv is the default
+   --outdir         Output directory, required!
+   --rename         Appends ".unlinkmkv" to the unoriginal unmodified file's name *NOT SUPPORTED
+   --replace        When completed, forcibly moves the new file over the original file's name. If you don't combine this with --rename, then it will REPLACE the original file! *NOT SUPPORTED
+   --keep-workdir   Don't clean working directory when finished, useful for debugging.
+   --fix-audio      Encode audio, not currently customizable; encodes to 320k AAC
+   --fix-video      Encode video, not currently customizable; encodes to 8-bit h264 at whatever the existing average bitrate was up to 110% higher then that.
+   --fix-subtitles  Defaults to on. Sometimes groups don't use uniform subtitle styles and fonts in all segments, it's a good idea to leave this enabled.
 
 =head2 SUPPORT
 

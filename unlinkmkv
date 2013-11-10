@@ -41,8 +41,8 @@ use Cwd            qw/cwd realpath abs_path/;
     my  $mkvinfo        = $toolpath . '/mkvinfo';
     my  $mkvmerge       = $toolpath . '/mkvmerge';
     my  $xmlparser      = XML::LibXML->new();
-    my  $reencode_audio = 0;
-    my  $reencode_video = 0;
+    my  $fix_audio      = 0;
+    my  $fix_video      = 0;
     my  $fix_subtitles  = 1;
     my  $rename         = 0;
     my  $replace        = 0;
@@ -52,8 +52,8 @@ use Cwd            qw/cwd realpath abs_path/;
 
     GetOptions (
 	'tmpdir=s'            => \$tmpdir,
-	'reencode-audio|ra!'  => \$reencode_audio,
-	'reencode-video|rv!'  => \$reencode_video,
+	'fix-audio|fa!'       => \$fix_audio,
+	'fix-video|fv!'       => \$fix_video,
 	'fix-subtitles|fs!'   => \$fix_subtitles,
 	'rename!'             => \$rename,
 	'replace!'            => \$replace,
@@ -295,18 +295,18 @@ use Cwd            qw/cwd realpath abs_path/;
 		}
 	    }
 
-	    if($reencode_video || $reencode_audio) {
+	    if($fix_video || $fix_audio) {
 		INFO "encoding parts";
 		foreach my $part (@parts) {
 		    my @vopt = qw/-vcodec copy/;
 		    my @aopt = qw/-acodec copy/;
 		    INFO "encoding: $part";
-		    if ($reencode_video) {
+		    if ($fix_video) {
 			my $br = bitrate($part);
 			@vopt  = undef;
 			@vopt  = ('-c:v', 'libx264', '-b:v', $br.'k', '-minrate', $br.'k', '-maxrate', ($br*2).'k', '-bufsize', '1835k');
 		    }
-		    if ($reencode_audio) {
+		    if ($fix_audio) {
 			@aopt = undef;
 			@aopt = qw/-map 0 -acodec ac3 -ab 320k/;
 		    }

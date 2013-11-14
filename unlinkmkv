@@ -34,7 +34,7 @@ use Cwd            qw/cwd realpath abs_path/;
     Log::Log4perl::NDC->push("");
     INFO "UnlinkMKV" and more();
 
-    our $tmpdir         = '/tmp/umkv';
+    our $tmpdir         = '/home/garret/tmp/umkv';
     my  $toolpath       = "/usr/bin";
     my  $ffmpeg         = "/opt/ffmpeg/bin/ffmpeg";
     my  $mkvext         = $toolpath . '/mkvextract';
@@ -218,6 +218,11 @@ use Cwd            qw/cwd realpath abs_path/;
 	    }
 	    less();
 
+	    my @atts;
+	    foreach my $att (split /\n/, `find $tmpdir/attach -type f`) {
+		push @atts, ('--attachment-mime-type', 'application/x-truetype-font', '--attach-file', $att);
+	    }
+
 	    INFO "creating splits";
 	    if(scalar(@splits) > 0) {
 		DEBUG "splitting file: $item";
@@ -228,7 +233,7 @@ use Cwd            qw/cwd realpath abs_path/;
 	    my (@parts, $LAST);
 	    my $count = 1;
 	    foreach my $segment (@segments) {
-		if(defined $segment->{id} && $segment->{start} eq '00:00:00.000000000' || ($LAST ne $segment->{file} && scalar(@splits) == 0)) {
+		if(defined $segment->{id} && $segment->{start} =~ /^00:00:00\./ || ($LAST ne $segment->{file} && scalar(@splits) == 0)) {
 		    DEBUG "part $segment->{file}";
 		    push @parts, $segment->{file};
 		}
@@ -290,8 +295,8 @@ use Cwd            qw/cwd realpath abs_path/;
 		    foreach my $T (@{$subs->{$f}}) {
 			push @stracks, $T;
 		    }
-		    sys($mkvmerge, '-o', "$f-fixsubs", '--no-chapters', '--no-subs', $f, @stracks);
-		    replace($f, "$f-fixsubs");
+		    sys($mkvmerge, '-o', "$f-fixsubs.mkv", '--no-chapters', '--no-subs', $f, @stracks, @atts);
+		    replace($f, "$f-fixsubs.mkv");
 		}
 	    }
 
@@ -316,10 +321,6 @@ use Cwd            qw/cwd realpath abs_path/;
 	    }
 
 	    INFO "building file";
-	    my @atts;
-	    foreach my $att (split /\n/, `find $tmpdir/attach -type f`) {
-		push @atts, ('--attachment-mime-type', 'application/x-truetype-font', '--attach-file', $att);
-	    }
 	    my @PRTS;
 	    foreach my $part (@parts) {
 		push @PRTS, $part;

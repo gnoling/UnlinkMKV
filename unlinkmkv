@@ -23,11 +23,16 @@ use Cwd            qw/cwd realpath abs_path/;
     );
 
     my $conf = qq(
-	log4perl.logger                   = $loglevel, STDINF
+	log4perl.logger                   = $loglevel, STDINF, STDFFF
 	log4perl.appender.STDINF          = Log::Log4perl::Appender::ScreenColoredLevels
 	log4perl.appender.STDINF.stderr   = 0
 	log4perl.appender.STDINF.layout   = PatternLayout
 	log4perl.appender.STDINF.layout.ConversionPattern = %x%m{chomp}%n
+	log4perl.appender.STDFFF          = Log::Log4perl::Appender::File
+	log4perl.appender.STDFFF.filename = /tmp/umkv.log
+	log4perl.appender.STDFFF.stderr   = 0
+	log4perl.appender.STDFFF.layout   = PatternLayout
+	log4perl.appender.STDFFF.layout.ConversionPattern = %m{chomp}%n
     );
     Log::Log4perl->init_once(\$conf);
 
@@ -327,7 +332,41 @@ use Cwd            qw/cwd realpath abs_path/;
 		push @PRTS, '+';
 	    }
 	    pop @PRTS;
-	    sys($mkvmerge, '--no-chapters', '--chapters', $tmpdir . "/$parent-chapters.xml", '-o', "$tmpdir/encodes/".basename($item), @PRTS, @atts);
+	    sys($mkvmerge, '--no-chapters', '-M', '--chapters', $tmpdir . "/$parent-chapters.xml", '-o', "$tmpdir/encodes/".basename($item), @PRTS); #, @atts);
+
+	    INFO "fixing subs, again... (maybe an mkvmerge issue?)";
+	    if($fix_subtitles) {
+		my @FS;
+		my $in  = 0;
+		my $sub = 0;
+		my ($N, $T, $D, $U);
+		for (split /\n/, sys($mkvinfo, "$tmpdir/encodes/".basename($item))) {
+		    chomp;
+		    if ($_ =~ /^\| \+ A track/) {
+			$in = 1;
+			undef $N;
+			undef $T;
+			undef $D;
+			undef $U;
+			$sub = 0;
+		    }
+		    elsif($in && $_ =~ /Track type: subtitles/) {
+			$sub = 1;
+		    }
+		    elsif($in && $_ =~ /Track number: .*: (\d)\)$/) {
+			$T = $1;
+		    }
+		    if (defined $in && $sub && $T) {
+			sys($mkvext, 'tracks', "$tmpdir/encodes/".basename($item), "$T:$tmpdir/encodes/$T.ass");
+			push @FS, "$tmpdir/encodes/$T.ass";
+			undef $T;
+			$in  = 0;
+			$sub = 0;
+		    }
+		}
+		sys($mkvmerge, '-o', "$tmpdir/encodes/fixed.".basename($item), '-S', "$tmpdir/encodes/".basename($item), @FS);
+		replace("$tmpdir/encodes/".basename($item), "$tmpdir/encodes/fixed.".basename($item));
+	    }
 
 	    INFO "moving built file to final destination";
 	    sys('/bin/mkdir', '-p', $out_dir);
@@ -516,7 +555,7 @@ sub sys {
 		$buf .= $line;
 	    }
 	    elsif($fh == $err) {
-		ERROR "sys !! $line";
+		TRACE "sys !! $line";
 		$buf .= $line;
 	    }
 	    else {

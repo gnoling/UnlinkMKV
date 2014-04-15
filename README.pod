@@ -69,14 +69,18 @@ This script requires:
    unlinkmkv {options} {file|path}
 
    Options:
-   --tmpdir         Set a custom temporary/working folder, /tmp/umkv is the default
-   --outdir         Output directory, required!
-   --rename         Appends ".unlinkmkv" to the unoriginal unmodified file's name *NOT SUPPORTED
-   --replace        When completed, forcibly moves the new file over the original file's name. If you don't combine this with --rename, then it will REPLACE the original file! *NOT SUPPORTED
-   --keep-workdir   Don't clean working directory when finished, useful for debugging.
-   --fix-audio      Encode audio, not currently customizable; encodes to 320k AAC
-   --fix-video      Encode video, not currently customizable; encodes to 8-bit h264 at whatever the existing average bitrate was up to 110% higher then that.
-   --fix-subtitles  Defaults to on. Sometimes groups don't use uniform subtitle styles and fonts in all segments, it's a good idea to leave this enabled.
+   --tmpdir               Set a custom temporary/working folder, /tmp/umkv is the default
+   --outdir               Output directory, required!
+   --keep-workdir         Don't clean working directory when finished, useful for debugging.
+   --fix-audio            Encode audio, not currently customizable; encodes to 320k AAC for the time being.
+   --fix-video            Encode video, not currently customizable; encodes to 8-bit h264 at whatever the existing average bitrate was up to 110% higher then that.
+   --fix-subtitles        Defaults to on. Sometimes groups don't use uniform subtitle styles and fonts in all segments, it's a good idea to leave this enabled.
+   --playresx             Occassionally the original encoder uses different subtitle resolutions in the different segments. When combined, it causes problems. This forcibly
+                          sets the X resolution for subtitle rendering.
+   --playresy             Same as above, but for the Y axis (vertical).
+   --ignore-default-flag  Occassionally the default chapter flag exists, but *all* chapters are disabled which confuses the script. Enable on those rare occassions.
+   --(no-)chapters        The script does its best to adjust the chapters, but it's not quite perfect. This disables including chapters in the final file.
+
 
 =head2 SUPPORT
 
@@ -85,6 +89,6 @@ Feel free to contact me via Github or by email at g.unlinkmkv -at- idiotb.us.
 
 =head2 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012 Garret Noling
+Copyright (C) 2012-2014 Garret Noling
 
 This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.

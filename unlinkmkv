@@ -115,6 +115,7 @@ use Cwd            qw/cwd realpath abs_path/;
         bless($self, $type);
 	$self->{opt}  = $opt;
 	$self->{xml}  = XML::LibXML->new();
+	$self->mktmp();
 	return $self;
     }
 
@@ -213,8 +214,9 @@ use Cwd            qw/cwd realpath abs_path/;
 			$ChapterTimeStart->setData($offs_time_end);
 			$ChapterTimeEnd->setData($self->add_duration_to_timecode($offs_time_end, $ChapterTimeEnd->textContent()));
 		    }
+		    $offs_time_end = $ChapterTimeEnd->textContent();
 		    $chapter->removeChild($chapter->findnodes('./ChapterSegmentUID'));
-		    WARN sprintf("A %s, %s, %s, %s", $ChapterTimeStart->textContent(), $ChapterTimeEnd->textContent(), $offset, $offs_time_end);
+		    WARN sprintf("[EXT]\n\tChStart\t%s\n\tChEnd\t%s\n\tOffset\t%s\n\tOffTE\t%s", $ChapterTimeStart->textContent(), $ChapterTimeEnd->textContent(), $offset, $offs_time_end);
 		}
 		else {
 		    eval { if(defined $ChapterTimeEnd->textContent() && defined $ChapterTimeStart->textContent()){}; 1 } or next;
@@ -229,7 +231,7 @@ use Cwd            qw/cwd realpath abs_path/;
 		    $ChapterTimeStart->setData($self->add_duration_to_timecode($ChapterTimeStart->textContent(), $offset));
 		    $ChapterTimeEnd->setData($self->add_duration_to_timecode($ChapterTimeEnd->textContent(),     $offset));
 		    $offs_time_end = $ChapterTimeEnd->textContent();
-		    WARN sprintf("B %s, %s, %s, %s", $ChapterTimeStart->textContent(), $ChapterTimeEnd->textContent(), $offset, $offs_time_end);
+		    WARN sprintf("[INT]\n\tChStart\t%s\n\tChEnd\t%s\n\tOffset\t%s\n\tOffTE\t%s", $ChapterTimeStart->textContent(), $ChapterTimeEnd->textContent(), $offset, $offs_time_end);
 		}
 		$chaptercount++;
 	    }

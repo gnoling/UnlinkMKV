@@ -10,11 +10,17 @@ use Math::BigFloat qw/:constant/;
 use Getopt::Long   qw/:config passthrough/;
 use Log::Log4perl  qw/:easy/;
 use File::Basename;
-use String::CRC32;
 use IPC::Open3;
 use IO::Select;
 use Symbol;
 use Cwd            qw/cwd realpath abs_path/;
+use File::Spec qw(catpath);
+use File::Path qw(make_path);
+
+# Conditionally load the Windows Console module if required
+if ($^O eq "MSWin32") {
+	eval "use Win32::Console::ANSI;"
+}
 
     my $loglevel = 'INFO';
     GetOptions (
@@ -32,12 +38,12 @@ use Cwd            qw/cwd realpath abs_path/;
     INFO "UnlinkMKV";
     UnlinkMKV::more();
 
-    my $out_dir        = '/home/garret/Desktop/UnlinkMKV';
-    my $tmpdir         = "/home/garret/tmp/umkv";
-    my $ffmpeg         = "/opt/ffmpeg/bin/ffmpeg";
-    my $mkvext         = "/usr/bin/mkvextract";
-    my $mkvinfo        = "/usr/bin/mkvinfo";
-    my $mkvmerge       = "/usr/bin/mkvmerge";
+    my $out_dir        = cwd();
+    my $tmpdir         = $ENV{TMP};
+    my $ffmpeg         = 'ffmpeg';
+    my $mkvext         = 'mkvextract';
+    my $mkvinfo        = 'mkvinfo';
+    my $mkvmerge       = 'mkvmerge';
     my $fix_audio      = 0;
     my $fix_video      = 0;
     my $fix_subtitles  = 1;
@@ -102,11 +108,11 @@ use Math::BigFloat qw/:constant/;
 use Getopt::Long   qw/:config passthrough/;
 use Log::Log4perl  qw/:easy/;
 use File::Basename;
-use String::CRC32;
 use IPC::Open3;
 use IO::Select;
 use Symbol;
 use Cwd            qw/cwd realpath abs_path/;
+use File::Path qw(make_path remove_tree);
 
     sub new {
         my $type      = shift;
@@ -121,7 +127,7 @@ use Cwd            qw/cwd realpath abs_path/;
 
     sub DESTROY {
 	my $self = shift;
-	$self->sys("/bin/rm",    "-fr", $self->{tmp});
+	remove_tree("$self->{tmp}");
 	DEBUG "removed tmp $self->{tmp} [exiting]";
     }
 
@@ -133,15 +139,28 @@ use Cwd            qw/cwd realpath abs_path/;
 	else {
 	    $self->{tmp} = $self->{opt}->{tmp};
 	    $self->{tmp} =~ s/\/$//;
-	    $self->{tmp} .= "/$$";
+	    $self->{tmp} = File::Spec->catdir("$self->{tmp}", "$$");
 	}
-	$self->sys("/bin/rm",    "-fr", $self->{tmp});
+	remove_tree("$self->{tmp}");
 	DEBUG "removed tmp $self->{tmp}";
-	$self->sys('/bin/mkdir', '-p', "$self->{tmp}/attach");
-	$self->sys('/bin/mkdir', '-p', "$self->{tmp}/parts");
-	$self->sys('/bin/mkdir', '-p', "$self->{tmp}/encodes");
-	$self->sys('/bin/mkdir', '-p', "$self->{tmp}/subtitles");
-	$self->sys('/bin/mkdir', '-p', "$self->{tmp}/segments");
+
+	# Create the working directories that we're going to require; use filesystem indepndent paths
+	my $new_path = File::Spec->catdir("$self->{tmp}", "attach");
+	make_path("$new_path");
+
+	$new_path = File::Spec->catdir("$self->{tmp}", "parts");
+	make_path("$new_path");
+
+	$new_path = File::Spec->catdir("$self->{tmp}", "encodes");
+	make_path("$new_path");
+
+	$new_path = File::Spec->catdir("$self->{tmp}", "subtitles");
+	make_path("$new_path");
+
+	$new_path = File::Spec->catdir("$self->{tmp}", "segments");
+	make_path("$new_path");
+
+
 	DEBUG "created tmp $self->{tmp}";
     }
 
@@ -150,6 +169,9 @@ use Cwd            qw/cwd realpath abs_path/;
 	my $item     = shift;
 	my $origpath = dirname(abs_path($item));
 	chdir($origpath);
+
+	# We need to quote the path for Windows stuff since it doesn't like spaces
+
 	INFO "processing $item";
 	more();
 	INFO "checking if file is segmented";
@@ -160,7 +182,8 @@ use Cwd            qw/cwd realpath abs_path/;
 	    my($parent, $dir, $suffix) = fileparse($item, qr/\.[mM][kK][vV]/);
 	    INFO "loading chapters";
 	    more();
-	    open my $H, '-|', $self->{opt}->{mkvext}, 'chapters', $item;
+	    my $cmd = "$self->{opt}->{mkvext} chapters \"$item\"";
+	    open my $H, "$cmd |";
 	    binmode $H;
 	    my $xml = $self->{xml}->load_xml(IO => $H);
 	    close $H;
@@ -247,7 +270,7 @@ use Cwd            qw/cwd realpath abs_path/;
 	    foreach my $mkv (<*.mkv>) {
 		$mkv = abs_path("$dir/$mkv");
 		next if $mkv eq $item;
-		my ($id, $dur) = $self->mkvinfo($mkv);
+		my ($id, $dur) = $self->mkvinfo("\"$mkv\"");
 		for (@segments) {
 		    next unless defined $_->{id};
 		    if($_->{id} eq $id && basename($mkv) ne basename($item)) {
@@ -278,7 +301,7 @@ use Cwd            qw/cwd realpath abs_path/;
 		my $in = 0;
 		my ($N, $T, $D, $U);
 		TRACE "FILE $file";
-		for(split /\n/, $self->sys($self->{opt}->{mkvinfo}, $file)) {
+		for(split /\n/, $self->sys($self->{opt}->{mkvinfo}, "\"$file\"")) {
 		    chomp;
 		    if ($_ =~ /^\| \+ Attached/) {
 			$in = 1;
@@ -305,25 +328,35 @@ use Cwd            qw/cwd realpath abs_path/;
 		}
 		close $H;
 		if (defined @{$seg->{attachments}} && @{$seg->{attachments}} > 0) {
-		    my $dir = `pwd`;
+		    my $dir = cwd();
 		    TRACE "chdir $self->{tmp}/attach";
 		    chdir("$self->{tmp}/attach");
-		    $self->sys($self->{opt}->{mkvext}, 'attachments', $file, (1..$#{$seg->{attachments}}+1));
+		    $self->sys($self->{opt}->{mkvext}, 'attachments', "\"$file\"", (1..$#{$seg->{attachments}}+1));
 		    chdir("$dir");
 		}
 	    }
 	    less();
 
 	    my @atts;
-	    foreach my $att (split /\n/, `find $self->{tmp}/attach -type f`) {
-		push @atts, ('--attachment-mime-type', 'application/x-truetype-font', '--attach-file', $att);
+
+	  	my $fileListing;
+
+		# If we're on Windows, then we have to do a SYMLINK hack instead of using the normal symlink
+		if( $^O eq 'MSWin32' ){
+			$fileListing = `cmd /c dir $self->{tmp}\\attach /a:-d /b`;
+		} else {
+			$fileListing = `find $self->{tmp}/attach -type f`;
+		}
+
+	    foreach my $att (split /\n/, $fileListing) {
+				push @atts, ('--attachment-mime-type', 'application/x-truetype-font', '--attach-file', "\"" . $att . "\"");
 	    }
 
 	    INFO "creating splits";
 	    more();
 	    if(scalar(@splits) > 0) {
 		DEBUG "splitting file: $item";
-		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-o', "$self->{tmp}/parts/split-%03d.mkv", $item, '--split', 'timecodes:' . join(',',@splits));
+		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-o', "$self->{tmp}/parts/split-%03d.mkv", "\"$item\"", '--split', 'timecodes:' . join(',',@splits));
 	    }
 	    less();
 
@@ -355,7 +388,7 @@ use Cwd            qw/cwd realpath abs_path/;
 		    my $in  = 0;
 		    my $sub = 0;
 		    my ($N, $T, $D, $U);
-		    for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, $part)) {
+		    for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, "\"$part\"")) {
 			chomp;
 			if ($_ =~ /^\| \+ A track/) {
 			    $in = 1;
@@ -372,7 +405,7 @@ use Cwd            qw/cwd realpath abs_path/;
 			    $T = $1;
 			}
 			if (defined $in && $sub && $T) {
-			    $self->sys($self->{opt}->{mkvext}, 'tracks', $part, "$T:$self->{tmp}/subtitles/".basename($part)."-$T.ass");
+			    $self->sys($self->{opt}->{mkvext}, 'tracks', "\"$part\"", "\"" . "$T:$self->{tmp}/subtitles/".basename($part)."-$T.ass" . "\"" );
 			    push @{$subs->{$part}}, "$self->{tmp}/subtitles/".basename($part)."-$T.ass";
 			    undef $T;
 			    $in  = 0;
@@ -403,9 +436,9 @@ use Cwd            qw/cwd realpath abs_path/;
 		    DEBUG $f;
 		    my @stracks;
 		    foreach my $T (@{$subs->{$f}}) {
-			push @stracks, $T;
+			push @stracks, "\"" . $T . "\"";
 		    }
-		    $self->sys($self->{opt}->{mkvmerge}, '-o', "$f-fixsubs.mkv", '--no-chapters', '--no-subs', $f, @stracks, @atts);
+		    $self->sys($self->{opt}->{mkvmerge}, '-o', "\"" . "$f-fixsubs.mkv" . "\"", '--no-chapters', '--no-subs', "\"" . $f . "\"", @stracks, @atts);
 		    $self->replace($f, "$f-fixsubs.mkv");
 		}
 		less();
@@ -427,7 +460,7 @@ use Cwd            qw/cwd realpath abs_path/;
 			@aopt = undef;
 			@aopt = qw/-map 0 -acodec ac3 -ab 320k/;
 		    }
-		    $self->sys($self->{opt}->{ffmpeg}, '-i', $part, @vopt, @aopt, "$part-fixed.mkv");
+		    $self->sys($self->{opt}->{ffmpeg}, '-i', "\"" . $part . "\"", @vopt, @aopt, "\"" . "$part-fixed.mkv" . "\"");
 		    $self->replace($part, "$part-fixed.mkv");
 		}
 		less();
@@ -437,15 +470,15 @@ use Cwd            qw/cwd realpath abs_path/;
 	    more();
 	    my @PRTS;
 	    foreach my $part (@parts) {
-		push @PRTS, $part;
+		push @PRTS, "\"" . $part . "\"";
 		push @PRTS, '+';
 	    }
 	    pop @PRTS;
 	    if($self->{opt}->{chapters}) {
-		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', $self->{tmp} . "/$parent-chapters.xml", '-o', "$self->{tmp}/encodes/".basename($item), @PRTS);
+		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', "\"" . $self->{tmp} . "/$parent-chapters.xml" . "\"", '-o', "\"" . "$self->{tmp}/encodes/".basename($item) . "\"", @PRTS);
 	    }
 	    else {
-		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', $self->{tmp} . "/$parent-chapters.xml", '-o', "$self->{tmp}/encodes/".basename($item), @PRTS);
+		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', "\"" . $self->{tmp} . "/$parent-chapters.xml" . "\"", '-o', "\"" . "$self->{tmp}/encodes/".basename($item) . "\"", @PRTS);
 	    }
 	    less();
 
@@ -456,7 +489,7 @@ use Cwd            qw/cwd realpath abs_path/;
 		my $in  = 0;
 		my $sub = 0;
 		my ($N, $T, $D, $U);
-		for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, "$self->{tmp}/encodes/".basename($item))) {
+		for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, "\"" . "$self->{tmp}/encodes/".basename($item) . "\"" )) {
 		    chomp;
 		    if ($_ =~ /^\| \+ A track/) {
 			$in = 1;
@@ -473,22 +506,22 @@ use Cwd            qw/cwd realpath abs_path/;
 			$T = $1;
 		    }
 		    if (defined $in && $sub && $T) {
-			$self->sys($self->{opt}->{mkvext}, 'tracks', "$self->{tmp}/encodes/".basename($item), "$T:$self->{tmp}/encodes/$T.ass");
+			$self->sys($self->{opt}->{mkvext}, 'tracks', "\"" . "$self->{tmp}/encodes/".basename($item) . "\"", "\"" . "$T:$self->{tmp}/encodes/$T.ass" . "\"");
 			push @FS, "$self->{tmp}/encodes/$T.ass";
 			undef $T;
 			$in  = 0;
 			$sub = 0;
 		    }
 		}
-		$self->sys($self->{opt}->{mkvmerge}, '-o', "$self->{tmp}/encodes/fixed.".basename($item), '-S', "$self->{tmp}/encodes/".basename($item), @FS);
+		$self->sys($self->{opt}->{mkvmerge}, '-o', "\"" . "$self->{tmp}/encodes/fixed.".basename($item) . "\"" , '-S', "\"" . "$self->{tmp}/encodes/".basename($item) . "\"", @FS);
 		$self->replace("$self->{tmp}/encodes/".basename($item), "$self->{tmp}/encodes/fixed.".basename($item));
 	    }
 	    less();
 
 	    INFO "moving built file to final destination";
 	    more();
-	    $self->sys('/bin/mkdir', '-p', $self->{opt}->{outdir});
-	    $self->sys('/bin/mv', "$self->{tmp}/encodes/".basename($item), "$self->{opt}->{outdir}/");
+	    make_path("$self->{opt}->{outdir}");
+	    rename("$self->{tmp}/encodes/".basename($item), "$self->{opt}->{outdir}/".basename($item));
 	    less();
 	}
 	$self->mktmp();
@@ -518,16 +551,19 @@ use Cwd            qw/cwd realpath abs_path/;
 	my $self   = shift;
 	my $dest   = shift;
 	my $source = shift;
-	$self->sys('/bin/rm', '-f', $dest);
-	$self->sys('/bin/mv', $source, $dest);
+	rmdir($dest);
+	rename($source, $dest);
     }
 
     sub is_linked {
 	my $self   = shift;
 	my $item   = shift;
 	my $linked = 0;
+
+	$item = "\"" . $item . "\"";
+
 	more();
-	foreach my $line (split /\n/, $self->sys($self->{opt}->{mkvext}, 'chapters', $item)) {
+	foreach my $line (split /\n/, $self->sys($self->{opt}->{mkvext}, 'chapters', "$item")) {
 	    if($line =~ /<ChapterSegmentUID/i) {
 		$linked = 1;
 	    }
@@ -547,9 +583,59 @@ use Cwd            qw/cwd realpath abs_path/;
 	my $link = shift;
 	my $file = shift;
 	DEBUG "setting part $link => $file";
-	$self->sys('/bin/ln', '-s', $file, "$self->{tmp}/parts/$link");
-	return "$self->{tmp}/parts/$link";
+
+
+	my $osname = $^O;
+
+	# If we're on Windows, then we have to do a SYMLINK hack instead of using the normal symlink
+	if( $osname eq 'MSWin32' ){
+	  	INFO "Running on Windows; attempting to use symbolic link fallback for Windows";
+		# Attempt to execute MKLINK on Windows
+		$link =~ s/([\/]+)/\\/g;
+		$file =~ s/([\/]+)/\\/g;
+
+		$self->sys('cmd', '/c', 'mklink', "$self->{tmp}\\parts\\$link", "\"$file\"");
+	} else {
+		$self->sys('/bin/ln', '-s',  "\"$file\"", "\"$self->{tmp}/parts/$link\"");
+	}
+		return "$self->{tmp}/parts/$link";
     }
+
+
+
+    # We use this instead of CRC32 so we can avoid requiring compiling native C code for usage
+	sub mycrc32 {
+	 my ($input, $init_value, $polynomial) = @_;
+
+	 $init_value = 0 unless (defined $init_value);
+	 $polynomial = 0xedb88320 unless (defined $polynomial);
+
+	 my @lookup_table;
+
+	 for (my $i=0; $i<256; $i++) {
+	   my $x = $i;
+	   for (my $j=0; $j<8; $j++) {
+	     if ($x & 1) {
+	       $x = ($x >> 1) ^ $polynomial;
+	     } else {
+	       $x = $x >> 1;
+	     }
+	   }
+	   push @lookup_table, $x;
+	 }
+
+	 my $crc = $init_value ^ 0xffffffff;
+
+	 foreach my $x (unpack ('C*', $input)) {
+	   $crc = (($crc >> 8) & 0xffffff) ^ $lookup_table[ ($crc ^ $x) & 0xff ];
+	 }
+
+	 $crc = $crc ^ 0xffffffff;
+
+	 return $crc;
+	}
+
+
 
     sub uniquify_substyles {
 	my $self = shift;
@@ -557,7 +643,7 @@ use Cwd            qw/cwd realpath abs_path/;
 	my @styles;
 	foreach my $T (@$S) {
 	    DEBUG $T;
-	    my $uniq = crc32($T);
+	    my $uniq = $self->mycrc32($T);
 	    open my $O, '>', "$T.new";
 	    open my $F, '<', $T;
 	    my $in = 0;
@@ -606,7 +692,7 @@ use Cwd            qw/cwd realpath abs_path/;
 	    }
 	    close $F;
 	    close $O;
-	    $self->sys('/bin/mv', '-f', "$T.new", $T);
+	    rename("$T.new", "$T");
 	}
 	return \@styles;
     }
@@ -698,9 +784,14 @@ use Cwd            qw/cwd realpath abs_path/;
 	my $self = shift;
 	my $app  = shift;
 	my ($pid, $in, $out, $err, $sel, $buf);
+	my $cmd = "$app @_";
+	TRACE "sys > $cmd";
+  my $dbuffer = `$cmd`;
+    return $dbuffer;
+
 	$err = gensym();
 	more();
-	TRACE "sys > $app @_";
+
 	$pid = open3($in, $out, $err, $app, @_) or LOGDIE "failed to open $app: @_";
 	$sel = new IO::Select;
 	$sel->add($out,$err);

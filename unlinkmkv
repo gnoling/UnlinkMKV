@@ -183,7 +183,8 @@ use Cwd            qw/cwd realpath abs_path/;
 	    foreach my $chapter ($xml->findnodes('//ChapterAtom')) {
 		my ($ChapterTimeStart) = $chapter->findnodes('./ChapterTimeStart/text()');
 		my ($ChapterTimeEnd)   = $chapter->findnodes('./ChapterTimeEnd/text()');
-		if($chapter->exists('ChapterSegmentUID') && $chapter->findvalue('ChapterFlagEnabled') == 1) {
+		my $ChapterEnabled     = ($chapter->findvalue('ChapterFlagEnabled') =~ /^\d+$/) ? $chapter->findvalue('ChapterFlagEnabled') : 1;
+		if($chapter->exists('ChapterSegmentUID') && $ChapterEnabled) {
 		    my ($SegmentUID, $SegmentELE, $SegmentUIDText);
 		    ($SegmentELE)   = $chapter->findnodes('./ChapterSegmentUID');
 		    ($SegmentUID)   = $chapter->findnodes('./ChapterSegmentUID/text()');
@@ -216,7 +217,7 @@ use Cwd            qw/cwd realpath abs_path/;
 		    }
 		    $offs_time_end = $ChapterTimeEnd->textContent();
 		    $chapter->removeChild($chapter->findnodes('./ChapterSegmentUID'));
-		    WARN sprintf("[EXT]\n\tChStart\t%s\n\tChEnd\t%s\n\tOffset\t%s\n\tOffTE\t%s", $ChapterTimeStart->textContent(), $ChapterTimeEnd->textContent(), $offset, $offs_time_end);
+		    WARN sprintf("[EXT]\n\tChStart\t%s\n\tChEnd\t%s\n\tOffset\t%s\n\tOffTE\t%s\n\tChEn\t%s", $ChapterTimeStart->textContent(), $ChapterTimeEnd->textContent(), $offset, $offs_time_end, $ChapterEnabled);
 		}
 		else {
 		    eval { if(defined $ChapterTimeEnd->textContent() && defined $ChapterTimeStart->textContent()){}; 1 } or next;
@@ -231,7 +232,7 @@ use Cwd            qw/cwd realpath abs_path/;
 		    $ChapterTimeStart->setData($self->add_duration_to_timecode($ChapterTimeStart->textContent(), $offset));
 		    $ChapterTimeEnd->setData($self->add_duration_to_timecode($ChapterTimeEnd->textContent(),     $offset));
 		    $offs_time_end = $ChapterTimeEnd->textContent();
-		    WARN sprintf("[INT]\n\tChStart\t%s\n\tChEnd\t%s\n\tOffset\t%s\n\tOffTE\t%s", $ChapterTimeStart->textContent(), $ChapterTimeEnd->textContent(), $offset, $offs_time_end);
+		    WARN sprintf("[INT]\n\tChStart\t%s\n\tChEnd\t%s\n\tOffset\t%s\n\tOffTE\t%s\n\tChEn\t%s", $ChapterTimeStart->textContent(), $ChapterTimeEnd->textContent(), $offset, $offs_time_end, $ChapterEnabled);
 		}
 		$chaptercount++;
 	    }

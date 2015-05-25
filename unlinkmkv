@@ -305,7 +305,7 @@ use Cwd            qw/cwd realpath abs_path/;
 		    }
 		}
 		close $H;
-		if (defined @{$seg->{attachments}} && @{$seg->{attachments}} > 0) {
+		if (defined $seg->{attachments} && @{$seg->{attachments}} > 0) {
 		    my $dir = `pwd`;
 		    TRACE "chdir $self->{tmp}/attach";
 		    chdir("$self->{tmp}/attach");

@@ -86,7 +86,6 @@ This script requires:
 
 Feel free to contact me via Github or by email at g.unlinkmkv -at- idiotb.us.
 
-
 =head2 COPYRIGHT AND LICENSE
 
 Copyright (C) 2012-2014 Garret Noling

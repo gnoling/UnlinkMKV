@@ -43,9 +43,9 @@ use File::Path     qw/mkpath/;
     $opt->{mkvext}         = "mkvextract";
     $opt->{mkvinfo}        = "mkvinfo";
     $opt->{mkvmerge}       = "mkvmerge";
-    $opt->{fix_audio}      = 0;
-    $opt->{fix_video}      = 0;
-    $opt->{fix_subtitles}  = 1;
+    $opt->{fixaudio}      = 0;
+    $opt->{fixvideo}      = 0;
+    $opt->{fixsubtitles}  = 1;
     $opt->{ignoredef}      = 0;
     $opt->{chapters}       = 1;
     $opt->{playresx};
@@ -67,13 +67,13 @@ use File::Path     qw/mkpath/;
 
     GetOptions ( \%$opt,
 	'tmpdir=s',
-	'fix-audio|fa!',
-	'fix-video|fv!',
-	'fix-subtitles|fs!',
+	'fixaudio|fa!',
+	'fixvideo|fv!',
+	'fixsubtitles|fs!',
 	'outdir=s',
 	'playresx=i',
 	'playresy=i',
-	'ignore-default-flag',
+	'ignoredefaultflag',
 	'chapters!',
 	'ffmpeg=s',
 	'mkvextract=s',
@@ -103,13 +103,13 @@ use File::Path     qw/mkpath/;
 	mkvinfo           => $opt->{mkvinfo},
 	mkvmerge          => $opt->{mkvmerge},
 	tmp               => $opt->{tmpdir},
-	fixaudio          => $opt->{fix_audio},
-	fixvideo          => $opt->{fix_video},
-	fixsubs           => $opt->{fix_subtitles},
+	fixaudio          => $opt->{fixaudio},
+	fixvideo          => $opt->{fixvideo},
+	fixsubs           => $opt->{fixsubtitles},
 	outdir            => $opt->{out_dir},
 	playresx          => $opt->{playresx},
 	playresy          => $opt->{playresy},
-	ignoredefaultflag => $opt->{ignoredef},
+	ignoredefaultflag => $opt->{ignoredefaultflag},
 	chapters          => $opt->{chapters},
     });
 
@@ -264,7 +264,14 @@ use File::Spec::Functions;
 		    }
 		    $offs_time_end = $ChapterTimeEnd->textContent();
 		    $chapter->removeChild($chapter->findnodes('./ChapterSegmentUID'));
-		    WARN sprintf("[EXT]\n\tChStart\t%s\n\tChEnd\t%s\n\tOffset\t%s\n\tOffTE\t%s\n\tChEn\t%s", $ChapterTimeStart->textContent(), $ChapterTimeEnd->textContent(), $offset, $offs_time_end, $ChapterEnabled);
+		    INFO "external";
+		    more();
+		    INFO "chstart " . $ChapterTimeStart->textContent();
+		    INFO "chend   " . $ChapterTimeEnd->textContent();
+		    INFO "offset  " . $offset;
+		    INFO "offte   " . $offs_time_end;
+		    INFO "chen    " . $ChapterEnabled;
+		    less();
 		}
 		else {
 		    eval { if(defined $ChapterTimeEnd->textContent() && defined $ChapterTimeStart->textContent()){}; 1 } or next;
@@ -279,7 +286,14 @@ use File::Spec::Functions;
 		    $ChapterTimeStart->setData($self->add_duration_to_timecode($ChapterTimeStart->textContent(), $offset));
 		    $ChapterTimeEnd->setData($self->add_duration_to_timecode($ChapterTimeEnd->textContent(),     $offset));
 		    $offs_time_end = $ChapterTimeEnd->textContent();
-		    WARN sprintf("[INT]\n\tChStart\t%s\n\tChEnd\t%s\n\tOffset\t%s\n\tOffTE\t%s\n\tChEn\t%s", $ChapterTimeStart->textContent(), $ChapterTimeEnd->textContent(), $offset, $offs_time_end, $ChapterEnabled);
+		    INFO "internal";
+		    more();
+		    INFO "chstart " . $ChapterTimeStart->textContent();
+		    INFO "chend   " . $ChapterTimeEnd->textContent();
+		    INFO "offset  " . $offset;
+		    INFO "offte   " . $offs_time_end;
+		    INFO "chen    " . $ChapterEnabled;
+		    less();
 		}
 		$chaptercount++;
 	    }
@@ -293,8 +307,8 @@ use File::Spec::Functions;
 	    INFO "looking for segment parts";
 	    more();
 	    foreach my $mkv (<*.mkv>) {
-		$mkv = canonpath(abs_path(catfile($dir, $mkv)));
 		next if $mkv eq $item;
+		$mkv = canonpath(abs_path(catfile($dir, $mkv)));
 		my ($id, $dur) = $self->mkvinfo($mkv);
 		for (@segments) {
 		    next unless defined $_->{id};

@@ -55,7 +55,7 @@ see the next section. Make sure you meet all the dependencies described in the d
 Configuration is done in a YAML file named unlinkmkv.ini that should exist next to the script. An example file is included named unlinkmkv.ini.dist. Copy this to unlinkmkv.ini and make
 any required changes for your system.
 
-==head2 WINDOWS
+=head2 WINDOWS
 
 This script has been updated for cross platform compatibility and currently is tested to work on arch linux, debian, ubuntu, and windows so long as all required dependencies are met. For
 windows an archive exists in the dist/ directory with a compiled version of the script, the required dependencies, and a pre-configured ini to use them -- This distribution is essentially

@@ -34,20 +34,20 @@ use File::Path     qw/mkpath/;
     UnlinkMKV::more();
 
     my $opt;
-    my $basedir            = canonpath(dirname(abs_path($0)));
-    my $inifile            = catfile($basedir, "unlinkmkv.ini");
-    my $cwd                = canonpath(cwd());
-    $opt->{out_dir}        = canonpath("$cwd/UMKV");
-    $opt->{tmpdir}         = canonpath("$cwd/UMKV/tmp");
-    $opt->{ffmpeg}         = "ffmpeg";
-    $opt->{mkvext}         = "mkvextract";
-    $opt->{mkvinfo}        = "mkvinfo";
-    $opt->{mkvmerge}       = "mkvmerge";
-    $opt->{fixaudio}      = 0;
-    $opt->{fixvideo}      = 0;
-    $opt->{fixsubtitles}  = 1;
-    $opt->{ignoredef}      = 0;
-    $opt->{chapters}       = 1;
+    my $basedir               = canonpath(dirname(abs_path($0)));
+    my $inifile               = catfile($basedir, "unlinkmkv.ini");
+    my $cwd                   = canonpath(cwd());
+    $opt->{out_dir}           = canonpath("$cwd/UMKV");
+    $opt->{tmpdir}            = canonpath("$cwd/UMKV/tmp");
+    $opt->{ffmpeg}            = "ffmpeg";
+    $opt->{mkvext}            = "mkvextract";
+    $opt->{mkvinfo}           = "mkvinfo";
+    $opt->{mkvmerge}          = "mkvmerge";
+    $opt->{fixaudio}          = 0;
+    $opt->{fixvideo}          = 0;
+    $opt->{fixsubtitles}      = 1;
+    $opt->{ignoredefaultflag} = 0;
+    $opt->{chapters}          = 1;
     $opt->{playresx};
     $opt->{playresy};
 
@@ -112,6 +112,10 @@ use File::Path     qw/mkpath/;
 	ignoredefaultflag => $opt->{ignoredefaultflag},
 	chapters          => $opt->{chapters},
     });
+
+    if(scalar(@ARGV) == 0) {
+	push @ARGV, $cwd;
+    }
 
     my @LIST;
     foreach my $item (@ARGV) {

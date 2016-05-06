@@ -14,6 +14,8 @@ version 1.00
 
 Using UnlinkMKV to unlink segments, the chapters when viewing the video ARE retained. The MKV spec requires that the segmented files are in the same directory, so does this. It doesn't matter if you rename the files as long as all required files are in the same directory as the one being processed, segmenting is based on internal IDs. Depending on how the original files were made, you may need to use the fix-audio and fix-video options.
 
+By default unlinkmkv will now use the current directory as a default video directory if a file or directory is not given on the command line. This means that if unlinkmkv is set up and on your path, the majority of the time you can simply enter the directory and simply run "unlinkmkv" with no options.
+
 Say we have the files:
 
    princess-ressurection-ep-1.mkv
@@ -29,7 +31,7 @@ Doing so will generate a new file with the opening and ending built-in instead o
 Now, we test the file in a video player. It's important to check for audio or video problems, especially when transitioning between where the segments would have come in. Often times this is the opening/ending and the main show, so seek inside both places and make sure sound is playing in both places, and the video looks fine. Let's
 pretend our sound is totally missing in the main video, and the video is corrupt!
 
-   unlinkmkv --fix-audio --fix-video --outdir "/home/user/Desktop/Princess Ressurection" princess-ressurection-ep-1.mkv
+   unlinkmkv --fixaudio --fixvideo --outdir "/home/user/Desktop/Princess Ressurection" princess-ressurection-ep-1.mkv
 
 What happens is sometimes encoders use codecs that don't play well with matroska, and can't be assembled as they were -- either the codec (OGG) or the settings (thanks, encoder guy) being the cause. The fix-audio and fix-video option simply re-encodes the audio and video into a uniform format that plays nice, with settings that try to not reduce the quality very much (not noticable), nor make the files hugemassive. See the FFMPEG notes!
 
@@ -43,15 +45,21 @@ You can also use an absolute or relative path instead, so, assume you're in a di
 
 You could process them all at once with:
 
-   unlinkmkv --fix-audio --fix-video --outdir "/home/user/Desktop/Princess Ressurection" "/home/user/videos/Princess Resurrection"
+   unlinkmkv --fixaudio --fixvideo --outdir "/home/user/Desktop/Princess Ressurection" "/home/user/videos/Princess Resurrection"
 
 =head2 INSTALLATION
 
-This script was made for use on linux, and has only been tested on LMDE (Debian), but should work on any linux (and maybe OSX?) setup that meets the required dependencies.
-Currently, it very definitely will not work on Windows without modification. You need to install perl, a handful of perl modules (the ones in the use's at the top of the script),
-and a REAL and RECENT version of ffmpeg (see dependency note -- you'll know if its the libav fork if it tells you to use avconv when running it) if you want to fix the audio or video.
+Clone this repository on linux and macosx, you can also simply "Download zip" on the right; I've heard there is an unofficial package for Arch linux that I'm told works well. For windows
+see the next section. Make sure you meet all the dependencies described in the dependency section.
 
-Also, the paths are hard coded in the script currently, but all of them are near the top. Change them to suite your system!
+Configuration is done in a YAML file named unlinkmkv.ini that should exist next to the script. An example file is included named unlinkmkv.ini.dist. Copy this to unlinkmkv.ini and make
+any required changes for your system.
+
+==head2 WINDOWS
+
+This script has been updated for cross platform compatibility and currently is tested to work on arch linux, debian, ubuntu, and windows so long as all required dependencies are met. For
+windows an archive exists in the dist/ directory with a compiled version of the script, the required dependencies, and a pre-configured ini to use them -- This distribution is essentially
+a "portable" windows version. After unarchiving either add the new path to your environment PATH variable or simply use an absolute path to it on the command line.
 
 =head2 DEPENDENCIES
 
@@ -60,7 +68,11 @@ This script requires:
    Perl        >= 5.8.9
    MKVToolnix  >= 5.1.0
    XML::LibXML >= 2.0001
-   Quite a few more perl modules
+   IPC::Run3
+   File::Which
+   String::CRC32
+   Log::Log4perl
+   Math::BigFloat
    FFMPEG      == *real* version of ffmpeg. Recent versions of Ubuntu and Debian come with a prominent ffmpeg fork called libav, which is *not* fully compatible.
    Hard drive space, if your temp directory is small, set it to someplace else -- especially if using fix audio or fix video!
 
@@ -71,15 +83,19 @@ This script requires:
    Options:
    --tmpdir               Set a custom temporary/working folder, /tmp/umkv is the default
    --outdir               Output directory, required!
-   --keep-workdir         Don't clean working directory when finished, useful for debugging.
-   --fix-audio            Encode audio, not currently customizable; encodes to 320k AAC for the time being.
-   --fix-video            Encode video, not currently customizable; encodes to 8-bit h264 at whatever the existing average bitrate was up to 110% higher then that.
-   --fix-subtitles        Defaults to on. Sometimes groups don't use uniform subtitle styles and fonts in all segments, it's a good idea to leave this enabled.
+   --fixaudio, -fa        Encode audio, not currently customizable; encodes to 320k AAC for the time being.
+   --fixvideo, -fv        Encode video, not currently customizable; encodes to 8-bit h264 at whatever the existing average bitrate was up to 110% higher then that.
+   --fixsubtitles, -fs    Defaults to on. Sometimes groups don't use uniform subtitle styles and fonts in all segments, it's a good idea to leave this enabled.
    --playresx             Occassionally the original encoder uses different subtitle resolutions in the different segments. When combined, it causes problems. This forcibly
                           sets the X resolution for subtitle rendering.
    --playresy             Same as above, but for the Y axis (vertical).
-   --ignore-default-flag  Occassionally the default chapter flag exists, but *all* chapters are disabled which confuses the script. Enable on those rare occassions.
+   --ignoredefaultflag    Occassionally the default chapter flag exists, but *all* chapters are disabled which confuses the script. Enable on those rare occassions.
    --(no-)chapters        The script does its best to adjust the chapters, but it's not quite perfect. This disables including chapters in the final file.
+   --ffmpeg [path]        Specify a path to the ffmpeg binary to use.
+   --mkvextract [path]    Specify a path to the mkvextract binary to use.
+   --mkvinfo [path]       Specify a path to the mkvinfo binary to use.
+   --mkvmerge [path]      Specify a path to the mkvmerge binary to use.
+
 
 
 =head2 SUPPORT

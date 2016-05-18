@@ -1,0 +1,11 @@
+out_dir = /home/USER/Desktop/UnlinkMKV
+tmpdir = /home/USER/tmp/umkv
+ffmpeg = /opt/ffmpeg/bin/ffmpeg
+mkvext = /usr/bin/mkvextract
+mkvinfo = /usr/bin/mkvinfo
+mkvmerge = /usr/bin/mkvmerge
+fixaudio = 0
+fixvideo = 0
+fixsubtitles = 1
+ignoredefaultflag = 0
+chapters = 1

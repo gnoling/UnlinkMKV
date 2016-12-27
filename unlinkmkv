@@ -37,7 +37,7 @@ use File::Path     qw/mkpath/;
     my $basedir               = canonpath(dirname(abs_path($0)));
     my $inifile               = catfile($basedir, "unlinkmkv.ini");
     my $cwd                   = canonpath(cwd());
-    $opt->{out_dir}           = canonpath("$cwd/UMKV");
+    $opt->{outdir}           = canonpath("$cwd/UMKV");
     $opt->{tmpdir}            = canonpath("$cwd/UMKV/tmp");
     $opt->{ffmpeg}            = "ffmpeg";
     $opt->{mkvext}            = "mkvextract";
@@ -81,7 +81,7 @@ use File::Path     qw/mkpath/;
 	'mkvmerge=s',
     );
 
-    $opt->{out_dir}  = canonpath($opt->{out_dir});
+    $opt->{outdir}  = canonpath($opt->{outdir});
     $opt->{ffmpeg}   = canonpath(abs_path(which $opt->{ffmpeg}));
     $opt->{mkvext}   = canonpath(abs_path(which $opt->{mkvext}));
     $opt->{mkvinfo}  = canonpath(abs_path(which $opt->{mkvinfo}));
@@ -106,7 +106,7 @@ use File::Path     qw/mkpath/;
 	fixaudio          => $opt->{fixaudio},
 	fixvideo          => $opt->{fixvideo},
 	fixsubs           => $opt->{fixsubtitles},
-	outdir            => $opt->{out_dir},
+	outdir            => $opt->{outdir},
 	playresx          => $opt->{playresx},
 	playresy          => $opt->{playresy},
 	ignoredefaultflag => $opt->{ignoredefaultflag},
@@ -122,7 +122,7 @@ use File::Path     qw/mkpath/;
 	if(-d $item) {
 	    opendir my $D, $item;
 	    while (my $F = readdir($D)) {
-		if (-f catfile($item, $F) && $F =~ /\.mkv$/i && !-f catfile($opt->{out_dir}, $F)) {
+		if (-f catfile($item, $F) && $F =~ /\.mkv$/i && !-f catfile($opt->{outdir}, $F)) {
 		    push @LIST, canonpath(abs_path("$item/$F"));
 		}
 	    }

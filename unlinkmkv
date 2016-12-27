@@ -22,7 +22,7 @@ use File::Path     qw/mkpath/;
 	'll|loglevel=s' => \$loglevel,
     );
 
-    $loglovel = uc($loglevel);
+    $loglevel = uc($loglevel);
     my $conf = qq(
 	log4perl.logger                   = $loglevel, STDINF
 	log4perl.appender.STDINF          = Log::Log4perl::Appender::Screen
@@ -57,12 +57,16 @@ use File::Path     qw/mkpath/;
 	open my $F, $inifile or LOGDIE "failed to open unlinkmkv.ini: $!";
 	while(my $line = <$F>) {
 	    chomp($line);
-	    $line =~ /^[\s\t]*([a-z0-9_]+)[\s\t]*=[\s\t]*["']?([^\s\t].*[^\s\t]?)["']?[\s\t]*$/;
-	    my $key = $1;
-	    my $val = $2;
-	    $val    =~ s/\$basedir/$basedir/g;
-	    DEBUG "[ini] [$key] = [$val]";
-	    $opt->{$key} = $val;
+	    if($line =~ /^[\s\t]*([a-z0-9_]+)[\s\t]*=[\s\t]*["']?([^\s\t].*[^\s\t]?)["']?[\s\t]*$/) {
+		my $key = $1;
+		my $val = $2;
+		$val    =~ s/\$basedir/$basedir/g;
+		DEBUG "[ini] [$key] = [$val]";
+		$opt->{$key} = $val;
+	    }
+	    else {
+		TRACE "[ini] skipping line [$line]";
+	    }
 	}
 	close $F;
     }

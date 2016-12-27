@@ -39,7 +39,7 @@ use File::Path     qw/mkpath/;
     my $basedir               = canonpath(dirname(abs_path($0)));
     my $inifile               = catfile($basedir, "unlinkmkv.ini");
     my $cwd                   = canonpath(cwd());
-    $opt->{outdir}           = canonpath("$cwd/UMKV");
+    $opt->{outdir}            = canonpath("$cwd/UMKV");
     $opt->{tmpdir}            = canonpath("$cwd/UMKV/tmp");
     $opt->{ffmpeg}            = "ffmpeg";
     $opt->{mkvext}            = "mkvextract";

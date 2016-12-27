@@ -21,6 +21,8 @@ use File::Path     qw/mkpath/;
     GetOptions (
 	'll|loglevel=s' => \$loglevel,
     );
+
+    $loglovel = uc($loglevel);
     my $conf = qq(
 	log4perl.logger                   = $loglevel, STDINF
 	log4perl.appender.STDINF          = Log::Log4perl::Appender::Screen

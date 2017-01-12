@@ -138,7 +138,7 @@ use File::Path     qw/mkpath/;
 	    push @LIST, canonpath(abs_path($item));
 	}
     }
-    do { $UMKV->process($_) } for @LIST;
+    do { $UMKV->process($_) } for sort @LIST;
     exit;
 
 package UnlinkMKV {
@@ -173,6 +173,9 @@ use File::Spec::Functions;
 	    chdir($self->{opt}->{outdir});
 	    rmtree($self->{tmp}, 0, 1);
 	    DEBUG "removed tmp $self->{tmp}";
+	    chdir($self->{opt}->{outdir});
+	    sleep 1;
+	    rmdir($self->{roottmp});
 	}
 	DEBUG "exiting";
     }
@@ -180,27 +183,27 @@ use File::Spec::Functions;
     sub mktmp {
 	my $self = shift;
 	if(!defined $self->{opt}->{tmp}) {
-	    $self->{tmp} = canonpath(cwd()."/UnlinkMKV/tmp/$$");
+	    $self->{roottmp} = canonpath(cwd()."/UnlinkMKV/tmp");
+	    $self->{tmp}     = canonpath(cwd()."/UnlinkMKV/tmp/$$");
 	}
 	else {
-	    $self->{tmp} = catfile($self->{opt}->{tmp}, $$);
+	    $self->{roottmp} = $self->{opt}->{tmp};
+	    $self->{tmp}     = catfile($self->{opt}->{tmp}, $$);
 	}
 	if(-d $self->{tmp}) {
 	    rmtree($self->{tmp}, 0, 1);
+	    DEBUG "removed tmp $self->{tmp}";
 	}
-	DEBUG "removed tmp $self->{tmp}";
 	$self->{attachdir}    = catfile($self->{tmp}, 'attach');
 	$self->{partsdir}     = catfile($self->{tmp}, 'parts');
 	$self->{encodesdir}   = catfile($self->{tmp}, 'encodes');
 	$self->{subtitlesdir} = catfile($self->{tmp}, 'subtitles');
-	$self->{segmentsdir}  = catfile($self->{tmp}, 'segments');
 	make_path(
 	    $self->{tmp},
 	    $self->{attachdir},
 	    $self->{partsdir},
 	    $self->{encodesdir},
 	    $self->{subtitlesdir},
-	    $self->{segmentsdir},
 	, { verbose => 0 });
 	DEBUG "created tmp $self->{tmp}";
     }
@@ -275,13 +278,6 @@ use File::Spec::Functions;
 		    $offs_time_end = $ChapterTimeEnd->textContent();
 		    $chapter->removeChild($chapter->findnodes('./ChapterSegmentUID'));
 		    INFO "external";
-		    more();
-		    INFO "chstart " . $ChapterTimeStart->textContent();
-		    INFO "chend   " . $ChapterTimeEnd->textContent();
-		    INFO "offset  " . $offset;
-		    INFO "offte   " . $offs_time_end;
-		    INFO "chen    " . $ChapterEnabled;
-		    less();
 		}
 		else {
 		    eval { if(defined $ChapterTimeEnd->textContent() && defined $ChapterTimeStart->textContent()){}; 1 } or next;
@@ -297,14 +293,14 @@ use File::Spec::Functions;
 		    $ChapterTimeEnd->setData($self->add_duration_to_timecode($ChapterTimeEnd->textContent(),     $offset));
 		    $offs_time_end = $ChapterTimeEnd->textContent();
 		    INFO "internal";
-		    more();
-		    INFO "chstart " . $ChapterTimeStart->textContent();
-		    INFO "chend   " . $ChapterTimeEnd->textContent();
-		    INFO "offset  " . $offset;
-		    INFO "offte   " . $offs_time_end;
-		    INFO "chen    " . $ChapterEnabled;
-		    less();
 		}
+		more();
+		INFO "chapter start   " . $ChapterTimeStart->textContent();
+		INFO "chapter end     " . $ChapterTimeEnd->textContent();
+		INFO "offset  start   " . $offset;
+		INFO "offset  end     " . $offs_time_end;
+		INFO "chapter enabled " . $ChapterEnabled;
+		less();
 		$chaptercount++;
 	    }
 	    less();
@@ -316,32 +312,43 @@ use File::Spec::Functions;
 
 	    INFO "looking for segment parts";
 	    more();
-	    foreach my $mkv (<*.mkv>) {
-		next if $mkv eq $item;
-		$mkv = canonpath(abs_path(catfile($dir, $mkv)));
-		my ($id, $dur) = $self->mkvinfo($mkv);
-		for (@segments) {
-		    next unless defined $_->{id};
-		    if($_->{id} eq $id && basename($mkv) ne basename($item)) {
-			$_->{file} = $self->setpart(basename($mkv), $mkv);
-			INFO "found part $_->{file}";
+	    if(!defined $self->{segments}) {
+		foreach my $mkv (<*.mkv>) {
+		    $mkv = canonpath(abs_path(catfile($dir, $mkv)));
+		    my ($id, $dur) = $self->mkvinfo($mkv);
+		    $self->{segments}->{$id} = {
+			file => $mkv,
+			dur  => $dur,
 		    }
+		}
+	    }
+	    for (@segments) {
+		next unless defined $_->{id};
+		if(defined $self->{segments}->{$_->{id}} && basename($self->{segments}->{$_->{id}}->{file}) ne basename($item)) {
+		    $_->{file} = $self->setpart(basename($self->{segments}->{$_->{id}}->{file}), $self->{segments}->{$_->{id}}->{file});
+		    INFO "found part $_->{file}";
 		}
 	    }
 	    less();
 
+	    more();
 	    INFO "checking that all required segments were found";
 	    my $okay_to_proceed = 1;
 	    for (@segments) {
 		if(defined $_->{id} && !defined $_->{file}) {
-		    DEBUG "missing segment: $_->{id}";
+		    WARN "missing segment: $_->{id}";
 		    $okay_to_proceed = 0;
 		}
 	    }
-	    if(!$okay_to_proceed) {
-		WARN "missing segments!";
+	    if($okay_to_proceed) {
+		INFO "all segments found";
+	    }
+	    else {
+		WARN "missing segments";
+		less();
 		return;
 	    }
+	    less();
 
 	    INFO "extracting attachments";
 	    more();
@@ -368,7 +375,13 @@ use File::Spec::Functions;
 			$U = $1;
 		    }
 		    if (defined $N && defined $T && defined $D && defined $U) {
-			push @{$seg->{attachments}}, { name => $N, type => $T, data => $D, UID => $U };
+			if(!-f "$self->{attachdir}/$N") {
+			    push @{$seg->{attachments}}, { name => $N, type => $T, data => $D, UID => $U };
+			    INFO "found $N";
+			}
+			else {
+			    DEBUG "skipping $N";
+			}
 			undef $N;
 			undef $T;
 			undef $D;
@@ -376,6 +389,7 @@ use File::Spec::Functions;
 		    }
 		}
 		if (defined $seg->{attachments} && @{$seg->{attachments}} > 0) {
+		    INFO "extracting attachments...";
 		    my $dir       = cwd();
 		    TRACE "chdir $self->{attachdir}";
 		    chdir($self->{attachdir});
@@ -395,10 +409,9 @@ use File::Spec::Functions;
 	    }
 	    closedir $D;
 
-	    INFO "creating splits";
 	    more();
 	    if(scalar(@splits) > 0) {
-		DEBUG "splitting file: $item";
+		INFO "creating " . scalar(@splits+1) . " splits from $item";
 		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-o', catfile($self->{partsdir}, "split-%03d.mkv"), $item, '--split', 'timecodes:' . join(',',@splits));
 	    }
 	    less();

@@ -106,7 +106,7 @@ Feel free to contact me via Github or by email at g.unlinkmkv -at- idiotb.us.
 
 MIT License
 
-Copyright (c) 2016 Garret C. Noling
+Copyright (c) 2016-2017 Garret C. Noling
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

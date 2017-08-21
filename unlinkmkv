@@ -25,7 +25,7 @@ use File::Path     qw/mkpath/;
     $loglevel = uc($loglevel);
     my $conf = qq(
 	log4perl.logger                   = $loglevel, STDINF
-	log4perl.appender.STDINF          = Log::Log4perl::Appender::Screen
+	log4perl.appender.STDINF          = Log::Log4perl::Appender::ScreenColoredLevels
 	log4perl.appender.STDINF.stderr   = 0
 	log4perl.appender.STDINF.layout   = PatternLayout
 	log4perl.appender.STDINF.layout.ConversionPattern = %x%m{chomp}%n
@@ -40,7 +40,7 @@ use File::Path     qw/mkpath/;
     my $inifile               = catfile($basedir, "unlinkmkv.ini");
     my $cwd                   = canonpath(cwd());
     $opt->{outdir}            = canonpath("$cwd/UMKV");
-    $opt->{tmpdir}            = canonpath("$cwd/UMKV/tmp");
+    $opt->{tmpdir}            = canonpath("$cwd/UMKV.tmp");
     $opt->{ffmpeg}            = "ffmpeg";
     $opt->{mkvext}            = "mkvextract";
     $opt->{mkvinfo}           = "mkvinfo";
@@ -174,7 +174,8 @@ use File::Spec::Functions;
 	    rmtree($self->{tmp}, 0, 1);
 	    DEBUG "removed tmp $self->{tmp}";
 	    chdir($self->{opt}->{outdir});
-	    sleep 1;
+	    #sleep 1;
+            DEBUG "removed tmp $self->{roottmp}";
 	    rmdir($self->{roottmp});
 	}
 	DEBUG "exiting";
@@ -574,11 +575,15 @@ use File::Spec::Functions;
 		$self->replace(catfile($self->{encodesdir}, basename($item)), catfile($self->{encodesdir}, "fixed." . basename($item)));
 	    }
 	    less();
-
 	    INFO "moving built file to final destination";
 	    more();
-	    make_path($self->{opt}->{outdir}, { verbose => 0 });
-	    move(catfile($self->{encodesdir}, basename($item)), $self->{opt}->{outdir});
+            if(-f catfile($self->{encodesdir}, basename($item))) {
+	        make_path($self->{opt}->{outdir}, { verbose => 0 });
+	        move(catfile($self->{encodesdir}, basename($item)), $self->{opt}->{outdir});
+            }
+            else {
+                WARN "file failed to build";
+            }
 	    less();
 	}
 	$self->mktmp();
@@ -623,10 +628,10 @@ use File::Spec::Functions;
 	    }
 	}
 	if($linked) {
-	    WARN "$item contains segmented chapters";
+	    WARN "file contains segmented chapters";
 	}
 	else {
-	    INFO "$item does not contain segmented chapters";
+	    INFO "file does not contain segmented chapters";
 	}
 	less();
 	return $linked;

@@ -25,7 +25,7 @@ use File::Path     qw/mkpath/;
     $loglevel = uc($loglevel);
     my $conf = qq(
 	log4perl.logger                   = $loglevel, STDINF
-	log4perl.appender.STDINF          = Log::Log4perl::Appender::ScreenColoredLevels
+	log4perl.appender.STDINF          = Log::Log4perl::Appender::Screen
 	log4perl.appender.STDINF.stderr   = 0
 	log4perl.appender.STDINF.layout   = PatternLayout
 	log4perl.appender.STDINF.layout.ConversionPattern = %x%m{chomp}%n

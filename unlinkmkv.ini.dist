@@ -1,5 +1,5 @@
-out_dir = /home/USER/Desktop/UnlinkMKV
-tmpdir = /home/USER/tmp/umkv
+#outdir = /home/USER/Desktop/UnlinkMKV
+#tmpdir = /home/USER/tmp/umkv
 ffmpeg = /opt/ffmpeg/bin/ffmpeg
 mkvext = /usr/bin/mkvextract
 mkvinfo = /usr/bin/mkvinfo
@@ -9,3 +9,7 @@ fixvideo = 0
 fixsubtitles = 1
 ignoredefaultflag = 0
 chapters = 1
+fixvideotemplate = -c:v libx264 -b:v {var_minrate}k -minrate {var_minrate}k -maxrate {var_maxrate}k -bufsize 1835k -max_muxing_queue_size 4000
+fixaudiotemplate = -map 0 -acodec ac3 -ab 320k
+var_minrate = (var_size * 1.1) / var_duration
+var_maxrate = var_minrate * 2

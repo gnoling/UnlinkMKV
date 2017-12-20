@@ -50,6 +50,9 @@ use File::Path     qw/mkpath/;
     $opt->{fixsubtitles}      = 1;
     $opt->{ignoredefaultflag} = 0;
     $opt->{chapters}          = 1;
+    $opt->{cleanup}           = 1;
+    $opt->{fixvideotemplate}  = '-c:v libx264 -b:v %br%k -minrate %br%k -maxrate %br2%k -bufsize 1835k';
+    $opt->{fixaudiotemplate}  = '-map 0 -acodec ac3 -ab 320k';
     $opt->{playresx};
     $opt->{playresy};
 
@@ -82,9 +85,12 @@ use File::Path     qw/mkpath/;
 	'ignoredefaultflag',
 	'chapters!',
 	'ffmpeg=s',
-	'mkvextract=s',
+	'mkvext=s',
 	'mkvinfo=s',
 	'mkvmerge=s',
+	'fixvideotemplate=s',
+	'fixaudiotemplate=s',
+	'cleanup!',
     );
 
     $opt->{outdir}   = canonpath($opt->{outdir});
@@ -103,21 +109,7 @@ use File::Path     qw/mkpath/;
     UnlinkMKV::less();
     UnlinkMKV::less();
 
-    my $UMKV = UnlinkMKV->new({
-	ffmpeg            => $opt->{ffmpeg},
-	mkvext            => $opt->{mkvext},
-	mkvinfo           => $opt->{mkvinfo},
-	mkvmerge          => $opt->{mkvmerge},
-	tmp               => $opt->{tmpdir},
-	fixaudio          => $opt->{fixaudio},
-	fixvideo          => $opt->{fixvideo},
-	fixsubs           => $opt->{fixsubtitles},
-	outdir            => $opt->{outdir},
-	playresx          => $opt->{playresx},
-	playresy          => $opt->{playresy},
-	ignoredefaultflag => $opt->{ignoredefaultflag},
-	chapters          => $opt->{chapters},
-    });
+    my $UMKV = UnlinkMKV->new($opt);
 
     if(scalar(@ARGV) == 0) {
 	push @ARGV, $cwd;
@@ -169,12 +161,11 @@ use File::Spec::Functions;
 
     sub DESTROY {
 	my $self = shift;
-	if(-d $self->{tmp}) {
+	if(-d $self->{tmpdir} && $self->{opt}->{cleanup}) {
 	    chdir($self->{opt}->{outdir});
-	    rmtree($self->{tmp}, 0, 1);
-	    DEBUG "removed tmp $self->{tmp}";
+	    rmtree($self->{tmpdir}, 0, 1);
+	    DEBUG "removed tmp $self->{tmpdir}";
 	    chdir($self->{opt}->{outdir});
-	    #sleep 1;
             DEBUG "removed tmp $self->{roottmp}";
 	    rmdir($self->{roottmp});
 	}
@@ -183,30 +174,30 @@ use File::Spec::Functions;
 
     sub mktmp {
 	my $self = shift;
-	if(!defined $self->{opt}->{tmp}) {
+	if(!defined $self->{opt}->{tmpdir}) {
 	    $self->{roottmp} = canonpath(cwd()."/UnlinkMKV/tmp");
-	    $self->{tmp}     = canonpath(cwd()."/UnlinkMKV/tmp/$$");
+	    $self->{tmpdir}  = canonpath(cwd()."/UnlinkMKV/tmp/$$");
 	}
 	else {
-	    $self->{roottmp} = $self->{opt}->{tmp};
-	    $self->{tmp}     = catfile($self->{opt}->{tmp}, $$);
+	    $self->{roottmp} = $self->{opt}->{tmpdir};
+	    $self->{tmpdir}  = catfile($self->{opt}->{tmpdir}, $$);
 	}
-	if(-d $self->{tmp}) {
-	    rmtree($self->{tmp}, 0, 1);
-	    DEBUG "removed tmp $self->{tmp}";
+	if(-d $self->{tmpdir}) {
+	    rmtree($self->{tmpdir}, 0, 1);
+	    DEBUG "removed tmp $self->{tmpdir}";
 	}
-	$self->{attachdir}    = catfile($self->{tmp}, 'attach');
-	$self->{partsdir}     = catfile($self->{tmp}, 'parts');
-	$self->{encodesdir}   = catfile($self->{tmp}, 'encodes');
-	$self->{subtitlesdir} = catfile($self->{tmp}, 'subtitles');
+	$self->{attachdir}    = catfile($self->{tmpdir}, 'attach');
+	$self->{partsdir}     = catfile($self->{tmpdir}, 'parts');
+	$self->{encodesdir}   = catfile($self->{tmpdir}, 'encodes');
+	$self->{subtitlesdir} = catfile($self->{tmpdir}, 'subtitles');
 	make_path(
-	    $self->{tmp},
+	    $self->{tmpdir},
 	    $self->{attachdir},
 	    $self->{partsdir},
 	    $self->{encodesdir},
 	    $self->{subtitlesdir},
 	, { verbose => 0 });
-	DEBUG "created tmp $self->{tmp}";
+	DEBUG "created tmp $self->{tmpdir}";
     }
 
     sub process {
@@ -225,7 +216,7 @@ use File::Spec::Functions;
 	    INFO "loading chapters";
 	    more();
 	    my $xml = $self->{xml}->load_xml(string => $self->sys($self->{opt}->{mkvext}, 'chapters', $item));
-	    open my $out_chapters_orig, '>', catfile($self->{tmp}, "$parent-chapters-original.xml");
+	    open my $out_chapters_orig, '>', catfile($self->{tmpdir}, "$parent-chapters-original.xml");
 	    print {$out_chapters_orig} $xml->toString;
 	    close $out_chapters_orig;
 	    my $offs_time_end            = '00:00:00.000000000';
@@ -307,7 +298,7 @@ use File::Spec::Functions;
 	    less();
 
 	    INFO "writing chapter temporary file";
-	    open my $out_chapters, '>', catfile($self->{tmp}, "$parent-chapters.xml");
+	    open my $out_chapters, '>', catfile($self->{tmpdir}, "$parent-chapters.xml");
 	    print {$out_chapters} $xml->toString;
 	    close $out_chapters;
 
@@ -437,7 +428,7 @@ use File::Spec::Functions;
 	    less();
 
 	    my $subs;
-	    if($self->{opt}->{fixsubs}) {
+	    if($self->{opt}->{fixsubtitles}) {
 		INFO "extracting subs";
 		more();
 		foreach my $part (@parts) {
@@ -510,13 +501,20 @@ use File::Spec::Functions;
 		    my @aopt = qw/-map 0 -acodec copy/;
 		    WARN $part;
 		    if ($self->{opt}->{fixvideo}) {
-			my $br = $self->bitrate($part);
-			@vopt  = undef;
-			@vopt  = ('-c:v', 'libx264', '-b:v', $br.'k', '-minrate', $br.'k', '-maxrate', ($br*2).'k', '-bufsize', '1835k');
+			@vopt   = undef;
+			my $VV = $self->parseoptvars($self->ffdetails($part));
+			$self->{opt}->{fixvideotemplate} =~ s/\t/ /g;
+			$self->{opt}->{fixvideotemplate} =~ s/  / /g;
+			do {
+			    $self->{opt}->{fixvideotemplate} =~ s/{$_}/$VV->{$_}/ig;
+			} for keys %$VV;
+			@vopt = split / /, $self->{opt}->{fixvideotemplate};
 		    }
 		    if ($self->{opt}->{fixaudio}) {
 			@aopt = undef;
-			@aopt = qw/-map 0 -acodec ac3 -ab 320k/;
+			$self->{opt}->{fixaudiotemplate} =~ s/\t/ /g;
+			$self->{opt}->{fixaudiotemplate} =~ s/  / /g;
+			@aopt = split / /, $self->{opt}->{fixaudiotemplate};
 		    }
 		    $self->sys($self->{opt}->{ffmpeg}, '-i', $part, @vopt, @aopt, "$part-fixed.mkv");
 		    $self->replace($part, "$part-fixed.mkv");
@@ -533,16 +531,16 @@ use File::Spec::Functions;
 	    }
 	    pop @PRTS;
 	    if($self->{opt}->{chapters}) {
-		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', catfile($self->{tmp}, "$parent-chapters.xml"), '-o', catfile($self->{encodesdir}, basename($item)), @PRTS);
+		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', catfile($self->{tmpdir}, "$parent-chapters.xml"), '-o', catfile($self->{encodesdir}, basename($item)), @PRTS);
 	    }
 	    else {
-		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', catfile($self->{tmp}, "$parent-chapters.xml"), '-o', catfile($self->{encodesdir}, basename($item)), @PRTS);
+		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', catfile($self->{tmpdir}, "$parent-chapters.xml"), '-o', catfile($self->{encodesdir}, basename($item)), @PRTS);
 	    }
 	    less();
 
 	    INFO "fixing subs, again... (maybe an mkvmerge issue?)";
 	    more();
-	    if($self->{opt}->{fixsubs}) {
+	    if($self->{opt}->{fixsubtitles}) {
 		my @FS;
 		my $in  = 0;
 		my $sub = 0;
@@ -586,27 +584,58 @@ use File::Spec::Functions;
             }
 	    less();
 	}
-	$self->mktmp();
+	$self->mktmp() if $self->{opt}->{cleanup};
 	less();
     }
 
-    sub bitrate {
+    sub parseoptvars {
 	my $self = shift;
-	my $file = shift;
-	my $size = int(((-s $file)/1024+.5)*1.1);
-	my $br   = 2000;
+	my $vars = shift;
+	my $V;
+	foreach my $key (keys %$vars) {
+	    $V->{"var_$key"} = "$vars->{$key}";
+	}
+	foreach my $var (grep($_ =~ /^var_/, keys %{$self->{opt}})) {
+	    $V->{$var}    = "$self->{opt}->{$var}";
+	    do { $V->{$_} = undef unless defined $V->{$_} }
+		for $V->{$var} =~ /([a-z]\w+(?:'[a-z]\w+)*)/ig;
+	}
+	for(0..(int(scalar(keys %$V)) * int(scalar(keys %$V)))) {
+	    foreach my $var (keys %$V) {
+		foreach my $word ($V->{$var} =~ /([a-z]\w+(?:'[a-z]\w+)*)/ig) {
+		    if(defined $V->{$word}) {
+			$V->{$var} =~ s/$word/$V->{$word}/;
+			if($V->{$var} !~ /[a-z]/i) {
+			    $V->{$var} = int((eval $V->{$var})+.5);
+			}
+		    }
+		}
+	    }
+	}
+	return $V;
+    }
+
+    sub ffdetails {
+	my $self     = shift;
+	my $file     = shift;
+	my $duration = 0;
+	my $size     = int((-s $file)/1024+.5);
+	my $br       = 0;
 	foreach my $line (split /\n/, $self->sys($self->{opt}->{ffmpeg}, '-i', $file)) {
 	    if($line =~ /duration: (\d+):(\d+):(\d+\.\d+),/i) {
-		my $duration = ($1*3600)+($2*60)+int($3+.5);
-		$br = int(($size / $duration)+.5);
-		DEBUG "duration [$1:$2:$3] = $duration seconds, fsize $size = ${br}k bitrate";
+		$duration = ($1*3600)+($2*60)+int($3+.5);
+		DEBUG "duration [$1:$2:$3] = $duration seconds";
 	    }
 	    if($line =~ /duration.*bitrate: (\d+) k/i) {
 		$br = $1;
-		DEBUG "original bitrate $br";
+		DEBUG "bitrate ${br}k";
 	    }
 	}
-	return $br;
+	return {
+	    bitrate  => $br,
+	    size     => $size,
+	    duration => $duration,
+	};
     }
 
     sub replace {

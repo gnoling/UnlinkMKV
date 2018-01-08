@@ -5,846 +5,862 @@
 require 5.010;
 use strict;
 use XML::LibXML;
-use File::Glob     qw/:globally :nocase/;
+use File::Glob qw/:globally :nocase/;
 use Math::BigFloat qw/:constant/;
-use Getopt::Long   qw/:config passthrough/;
-use Log::Log4perl  qw/:easy/;
+use Getopt::Long qw/:config passthrough/;
+use Log::Log4perl qw/:easy/;
 use File::Basename;
 use String::CRC32;
 use IPC::Run3;
-use Cwd            qw/cwd realpath abs_path/;
-use File::Which;   qw/which/;
+use Cwd qw/cwd realpath abs_path/;
+use File::Which;
+qw/which/;
 use File::Spec::Functions;
-use File::Path     qw/mkpath/;
+use File::Path qw/mkpath/;
 
-    my $loglevel = 'INFO';
-    GetOptions (
-	'll|loglevel=s' => \$loglevel,
-    );
+  my $loglevel = 'INFO';
+  GetOptions(
+    'll|loglevel=s' => \$loglevel,
+  );
 
-    $loglevel = uc($loglevel);
-    my $conf = qq(
-	log4perl.logger                   = $loglevel, STDINF
-	log4perl.appender.STDINF          = Log::Log4perl::Appender::Screen
-	log4perl.appender.STDINF.stderr   = 0
-	log4perl.appender.STDINF.layout   = PatternLayout
-	log4perl.appender.STDINF.layout.ConversionPattern = %x%m{chomp}%n
-    );
-    Log::Log4perl->init_once(\$conf);
-    Log::Log4perl::NDC->push("");
-    INFO "UnlinkMKV";
-    UnlinkMKV::more();
+  $loglevel = uc($loglevel);
+  my $conf = qq(
+    log4perl.logger                   = $loglevel, STDINF
+    log4perl.appender.STDINF          = Log::Log4perl::Appender::Screen
+    log4perl.appender.STDINF.stderr   = 0
+    log4perl.appender.STDINF.layout   = PatternLayout
+    log4perl.appender.STDINF.layout.ConversionPattern = %x%m{chomp}%n
+  );
+  Log::Log4perl->init_once(\$conf);
+  Log::Log4perl::NDC->push("");
+  INFO "UnlinkMKV";
+  UnlinkMKV::more();
 
-    my $opt;
-    my $basedir               = canonpath(dirname(abs_path($0)));
-    my $inifile               = catfile($basedir, "unlinkmkv.ini");
-    my $cwd                   = canonpath(cwd());
-    $opt->{outdir}            = canonpath("$cwd/UMKV");
-    $opt->{tmpdir}            = canonpath("$cwd/UMKV.tmp");
-    $opt->{ffmpeg}            = "ffmpeg";
-    $opt->{mkvext}            = "mkvextract";
-    $opt->{mkvinfo}           = "mkvinfo";
-    $opt->{mkvmerge}          = "mkvmerge";
-    $opt->{fixaudio}          = 0;
-    $opt->{fixvideo}          = 0;
-    $opt->{fixsubtitles}      = 1;
-    $opt->{ignoredefaultflag} = 0;
-    $opt->{chapters}          = 1;
-    $opt->{cleanup}           = 1;
-    $opt->{fixvideotemplate}  = '-c:v libx264 -b:v %br%k -minrate %br%k -maxrate %br2%k -bufsize 1835k';
-    $opt->{fixaudiotemplate}  = '-map 0 -acodec ac3 -ab 320k';
-    $opt->{playresx};
-    $opt->{playresy};
+  my $opt;
+  my $basedir = canonpath(dirname(abs_path($0)));
+  my $inifile = catfile($basedir, "unlinkmkv.ini");
+  my $cwd     = canonpath(cwd());
+  $opt->{outdir}            = canonpath("$cwd/UMKV");
+  $opt->{tmpdir}            = canonpath("$cwd/UMKV.tmp");
+  $opt->{ffmpeg}            = "ffmpeg";
+  $opt->{mkvext}            = "mkvextract";
+  $opt->{mkvinfo}           = "mkvinfo";
+  $opt->{mkvmerge}          = "mkvmerge";
+  $opt->{fixaudio}          = 0;
+  $opt->{fixvideo}          = 0;
+  $opt->{fixsubtitles}      = 1;
+  $opt->{ignoredefaultflag} = 0;
+  $opt->{chapters}          = 1;
+  $opt->{cleanup}           = 1;
+  $opt->{fixvideotemplate}  = '-c:v libx264 -b:v %br%k -minrate %br%k -maxrate %br2%k -bufsize 1835k';
+  $opt->{fixaudiotemplate}  = '-map 0 -acodec ac3 -ab 320k';
+  $opt->{playresx};
+  $opt->{playresy};
 
-    if(-f $inifile) {
-	open my $F, $inifile or LOGDIE "failed to open unlinkmkv.ini: $!";
-	while(my $line = <$F>) {
-	    chomp($line);
-	    if($line =~ /^[\s\t]*([a-z0-9_]+)[\s\t]*=[\s\t]*["']?([^\s\t].*[^\s\t]?)["']?[\s\t]*$/) {
-		my $key = $1;
-		my $val = $2;
-		$val    =~ s/\$basedir/$basedir/g;
-		DEBUG "[ini] [$key] = [$val]";
-		$opt->{$key} = $val;
-	    }
-	    else {
-		TRACE "[ini] skipping line [$line]";
-	    }
-	}
-	close $F;
+  if(-f $inifile) {
+    open my $F, $inifile or LOGDIE "failed to open unlinkmkv.ini: $!";
+    while (my $line = <$F>){
+      chomp($line);
+      if($line =~ /^[\s\t]*([a-z0-9_]+)[\s\t]*=[\s\t]*["']?([^\s\t].*[^\s\t]?)["']?[\s\t]*$/) {
+        my $key = $1;
+        my $val = $2;
+        $val =~ s/\$basedir/$basedir/g;
+        DEBUG "[ini] [$key] = [$val]";
+        $opt->{$key} = $val;
+      }
+      else {
+        TRACE "[ini] skipping line [$line]";
+      }
     }
+    close $F;
+  }
 
-    GetOptions ( \%$opt,
-	'tmpdir=s',
-	'fixaudio|fa!',
-	'fixvideo|fv!',
-	'fixsubtitles|fs!',
-	'outdir=s',
-	'playresx=i',
-	'playresy=i',
-	'ignoredefaultflag',
-	'chapters!',
-	'ffmpeg=s',
-	'mkvext=s',
-	'mkvinfo=s',
-	'mkvmerge=s',
-	'fixvideotemplate=s',
-	'fixaudiotemplate=s',
-	'cleanup!',
-    );
+  GetOptions(
+    \%$opt,
+    'tmpdir=s',
+    'fixaudio|fa!',
+    'fixvideo|fv!',
+    'fixsubtitles|fs!',
+    'outdir=s',
+    'playresx=i',
+    'playresy=i',
+    'ignoredefaultflag',
+    'chapters!',
+    'ffmpeg=s',
+    'mkvext=s',
+    'mkvinfo=s',
+    'mkvmerge=s',
+    'fixvideotemplate=s',
+    'fixaudiotemplate=s',
+    'cleanup!',
+  );
 
-    $opt->{outdir}   = canonpath($opt->{outdir});
-    $opt->{ffmpeg}   = canonpath(abs_path(which $opt->{ffmpeg}));
-    $opt->{mkvext}   = canonpath(abs_path(which $opt->{mkvext}));
-    $opt->{mkvinfo}  = canonpath(abs_path(which $opt->{mkvinfo}));
-    $opt->{mkvmerge} = canonpath(abs_path(which $opt->{mkvmerge}));
-    $opt->{tmpdir}   = canonpath($opt->{tmpdir});
+  $opt->{outdir}   = canonpath($opt->{outdir});
+  $opt->{ffmpeg}   = canonpath(abs_path(which $opt->{ffmpeg}));
+  $opt->{mkvext}   = canonpath(abs_path(which $opt->{mkvext}));
+  $opt->{mkvinfo}  = canonpath(abs_path(which $opt->{mkvinfo}));
+  $opt->{mkvmerge} = canonpath(abs_path(which $opt->{mkvmerge}));
+  $opt->{tmpdir}   = canonpath($opt->{tmpdir});
 
-    UnlinkMKV::more();
-    INFO "Options";
-    UnlinkMKV::more();
-    foreach my $key (sort keys %$opt) {
-	INFO "$key: $opt->{$key}";
+  UnlinkMKV::more();
+  INFO "Options";
+  UnlinkMKV::more();
+  foreach my $key (sort keys %$opt){
+    INFO "$key: $opt->{$key}";
+  }
+  UnlinkMKV::less();
+  UnlinkMKV::less();
+
+  my $UMKV = UnlinkMKV->new($opt);
+
+  if(scalar(@ARGV) == 0) {
+    push @ARGV, $cwd;
+  }
+
+  my @LIST;
+  foreach my $item (@ARGV) {
+    if(-d $item) {
+      opendir my $D, $item;
+      while (my $F = readdir($D)){
+        if(-f catfile($item, $F)&& $F =~ /\.mkv$/i && !-f catfile($opt->{outdir}, $F)) {
+          push @LIST, canonpath(abs_path("$item/$F"));
+        }
+      }
+      closedir $D;
     }
-    UnlinkMKV::less();
-    UnlinkMKV::less();
-
-    my $UMKV = UnlinkMKV->new($opt);
-
-    if(scalar(@ARGV) == 0) {
-	push @ARGV, $cwd;
+    elsif(-f $item) {
+      push @LIST, canonpath(abs_path($item));
     }
+  }
+  do { $UMKV->process($_) }
+    for sort @LIST;
 
-    my @LIST;
-    foreach my $item (@ARGV) {
-	if(-d $item) {
-	    opendir my $D, $item;
-	    while (my $F = readdir($D)) {
-		if (-f catfile($item, $F) && $F =~ /\.mkv$/i && !-f catfile($opt->{outdir}, $F)) {
-		    push @LIST, canonpath(abs_path("$item/$F"));
-		}
-	    }
-	    closedir $D;
-	}
-	elsif(-f $item) {
-	    push @LIST, canonpath(abs_path($item));
-	}
-    }
-    do { $UMKV->process($_) } for sort @LIST;
-    exit;
+  exit;
 
 package UnlinkMKV {
 use strict;
 use XML::LibXML;
-use File::Glob     qw/:globally :nocase/;
+use File::Glob qw/:globally :nocase/;
 use Math::BigFloat qw/:constant/;
-use Getopt::Long   qw/:config passthrough/;
-use Log::Log4perl  qw/:easy/;
+use Getopt::Long qw/:config passthrough/;
+use Log::Log4perl qw/:easy/;
 use File::Basename;
 use String::CRC32;
 use IPC::Run3;
-use Cwd            qw/cwd realpath abs_path/;
-use File::Path     qw/make_path rmtree/;
+use Cwd qw/cwd realpath abs_path/;
+use File::Path qw/make_path rmtree/;
 use File::Copy;
 use File::Spec::Functions;
 
-    sub new {
-        my $type              = shift;
-	my $opt               = shift;
-        my ($self)            = {};
-        bless($self, $type);
-	$self->{opt}          = $opt;
-	$self->{xml}          = XML::LibXML->new();
-	$self->mktmp();
-	return $self;
+  sub new {
+    my $type   = shift;
+    my $opt    = shift;
+    my ($self) = {};
+    bless($self, $type);
+    $self->{opt} = $opt;
+    $self->{xml} = XML::LibXML->new();
+    $self->mktmp();
+    return $self;
+  }
+
+  sub DESTROY {
+    my $self = shift;
+    if(-d $self->{tmpdir} && $self->{opt}->{cleanup}) {
+      chdir($self->{opt}->{outdir});
+      rmtree($self->{tmpdir}, 0, 1);
+      DEBUG "removed tmp $self->{tmpdir}";
+      chdir($self->{opt}->{outdir});
+      DEBUG "removed tmp $self->{roottmp}";
+      rmdir($self->{roottmp});
     }
+    DEBUG "exiting";
+  }
 
-    sub DESTROY {
-	my $self = shift;
-	if(-d $self->{tmpdir} && $self->{opt}->{cleanup}) {
-	    chdir($self->{opt}->{outdir});
-	    rmtree($self->{tmpdir}, 0, 1);
-	    DEBUG "removed tmp $self->{tmpdir}";
-	    chdir($self->{opt}->{outdir});
-            DEBUG "removed tmp $self->{roottmp}";
-	    rmdir($self->{roottmp});
-	}
-	DEBUG "exiting";
+  sub mktmp {
+    my $self = shift;
+    if(!defined $self->{opt}->{tmpdir}) {
+      $self->{roottmp} = canonpath(cwd() . "/UnlinkMKV/tmp");
+      $self->{tmpdir}  = canonpath(cwd() . "/UnlinkMKV/tmp/$$");
     }
-
-    sub mktmp {
-	my $self = shift;
-	if(!defined $self->{opt}->{tmpdir}) {
-	    $self->{roottmp} = canonpath(cwd()."/UnlinkMKV/tmp");
-	    $self->{tmpdir}  = canonpath(cwd()."/UnlinkMKV/tmp/$$");
-	}
-	else {
-	    $self->{roottmp} = $self->{opt}->{tmpdir};
-	    $self->{tmpdir}  = catfile($self->{opt}->{tmpdir}, $$);
-	}
-	if(-d $self->{tmpdir}) {
-	    rmtree($self->{tmpdir}, 0, 1);
-	    DEBUG "removed tmp $self->{tmpdir}";
-	}
-	$self->{attachdir}    = catfile($self->{tmpdir}, 'attach');
-	$self->{partsdir}     = catfile($self->{tmpdir}, 'parts');
-	$self->{encodesdir}   = catfile($self->{tmpdir}, 'encodes');
-	$self->{subtitlesdir} = catfile($self->{tmpdir}, 'subtitles');
-	make_path(
-	    $self->{tmpdir},
-	    $self->{attachdir},
-	    $self->{partsdir},
-	    $self->{encodesdir},
-	    $self->{subtitlesdir},
-	, { verbose => 0 });
-	DEBUG "created tmp $self->{tmpdir}";
+    else {
+      $self->{roottmp} = $self->{opt}->{tmpdir};
+      $self->{tmpdir} = catfile($self->{opt}->{tmpdir}, $$);
     }
+    if(-d $self->{tmpdir}) {
+      rmtree($self->{tmpdir}, 0, 1);
+      DEBUG "removed tmp $self->{tmpdir}";
+    }
+    $self->{attachdir}    = catfile($self->{tmpdir}, 'attach');
+    $self->{partsdir}     = catfile($self->{tmpdir}, 'parts');
+    $self->{encodesdir}   = catfile($self->{tmpdir}, 'encodes');
+    $self->{subtitlesdir} = catfile($self->{tmpdir}, 'subtitles');
+    make_path(
+      $self->{tmpdir},
+      $self->{attachdir},
+      $self->{partsdir},
+      $self->{encodesdir},
+      $self->{subtitlesdir},
+      { verbose => 0 }
+    );
+    DEBUG "created tmp $self->{tmpdir}";
+  }
 
-    sub process {
-	my $self     = shift;
-	my $item     = shift;
-	my $origpath = canonpath(dirname($item));
-	chdir($origpath);
-	INFO "processing $item";
-	more();
-	INFO "checking if file is segmented";
-	if($self->is_linked($item)) {
-	    INFO "generating chapter file";
-	    more();
-	    my(@segments, @splits);
-	    my($parent, $dir, $suffix) = fileparse($item, qr/\.[mM][kK][vV]/);
-	    INFO "loading chapters";
-	    more();
-	    my $xml = $self->{xml}->load_xml(string => $self->sys($self->{opt}->{mkvext}, 'chapters', $item));
-	    open my $out_chapters_orig, '>', catfile($self->{tmpdir}, "$parent-chapters-original.xml");
-	    print {$out_chapters_orig} $xml->toString;
-	    close $out_chapters_orig;
-	    my $offs_time_end            = '00:00:00.000000000';
-	    my $last_time_end            = '00:00:00.000000000';
-	    my $offset                   = '00:00:00.000000000';
-	    my $chaptercount             = 1;
-	    foreach my $edition ($xml->findnodes('//EditionFlagDefault[.=0]')) {
-		if(!$self->{opt}->{ignoredefaultflag}) {
-		    $edition->parentNode->unbindNode;
-		    WARN "non-default chapter dropped";
-		}
-		else {
-		    INFO "non-default chapter kept on purpose";
-		}
-	    }
-	    foreach my $chapter ($xml->findnodes('//ChapterAtom')) {
-		my ($ChapterTimeStart) = $chapter->findnodes('./ChapterTimeStart/text()');
-		my ($ChapterTimeEnd)   = $chapter->findnodes('./ChapterTimeEnd/text()');
-		my $ChapterEnabled     = ($chapter->findvalue('ChapterFlagEnabled') =~ /^\d+$/) ? $chapter->findvalue('ChapterFlagEnabled') : 1;
-		if($chapter->exists('ChapterSegmentUID') && $ChapterEnabled) {
-		    my ($SegmentUID, $SegmentELE, $SegmentUIDText);
-		    ($SegmentELE)   = $chapter->findnodes('./ChapterSegmentUID');
-		    ($SegmentUID)   = $chapter->findnodes('./ChapterSegmentUID/text()');
-		    $SegmentUIDText = $SegmentUID->textContent();
-		    if($SegmentELE->getAttribute('format') eq 'hex') {
-			$SegmentUIDText =~ s/\n//g;
-			$SegmentUIDText =~ s/\s//g;
-			$SegmentUIDText =~ s/([a-zA-Z0-9]{2})/ 0x$1/g;
-			$SegmentUIDText =~ s/^\s//;
-		    }
-		    elsif($SegmentELE->getAttribute('format') eq 'ascii') {
-			$SegmentUIDText =~ s/(.)/sprintf("0x%x ",ord($1))/eg;
-			$SegmentUIDText =~ s/\s$//;
-		    }
-		    push @segments, {
-			start       => $ChapterTimeStart->textContent(),
-			stop        => $ChapterTimeEnd->textContent(),
-			id          => $SegmentUIDText,
-			split_start => $last_time_end
-		    };
-		    push @splits, $last_time_end unless $last_time_end eq '00:00:00.000000000';
-		    $offset = $self->add_duration_to_timecode($offset, $ChapterTimeEnd->textContent());
-		    if($offs_time_end eq '00:00:00.000000000' && $chaptercount > 1) {
-			$ChapterTimeStart->setData($offset);
-			$ChapterTimeEnd->setData($self->add_duration_to_timecode($offset, $ChapterTimeEnd->textContent()));
-		    }
-		    else {
-			$ChapterTimeStart->setData($offs_time_end);
-			$ChapterTimeEnd->setData($self->add_duration_to_timecode($offs_time_end, $ChapterTimeEnd->textContent()));
-		    }
-		    $offs_time_end = $ChapterTimeEnd->textContent();
-		    $chapter->removeChild($chapter->findnodes('./ChapterSegmentUID'));
-		    INFO "external";
-		}
-		else {
-		    eval { if(defined $ChapterTimeEnd->textContent() && defined $ChapterTimeStart->textContent()){}; 1 } or next;
-		    push @segments, {
-			file        => $self->setpart(basename($item), abs_path($item)),
-			start       => $ChapterTimeStart->textContent(),
-			stop        => $ChapterTimeEnd->textContent(),
-			split_start => $ChapterTimeStart->textContent(),
-			split_stop  => $ChapterTimeEnd->textContent()
-		    };
-		    $last_time_end = $ChapterTimeEnd->textContent();
-		    $ChapterTimeStart->setData($self->add_duration_to_timecode($ChapterTimeStart->textContent(), $offset));
-		    $ChapterTimeEnd->setData($self->add_duration_to_timecode($ChapterTimeEnd->textContent(),     $offset));
-		    $offs_time_end = $ChapterTimeEnd->textContent();
-		    INFO "internal";
-		}
-		more();
-		INFO "chapter start   " . $ChapterTimeStart->textContent();
-		INFO "chapter end     " . $ChapterTimeEnd->textContent();
-		INFO "offset  start   " . $offset;
-		INFO "offset  end     " . $offs_time_end;
-		INFO "chapter enabled " . $ChapterEnabled;
-		less();
-		$chaptercount++;
-	    }
-	    less();
+  sub process {
+    my $self     = shift;
+    my $item     = shift;
+    my $origpath = canonpath(dirname($item));
+    chdir($origpath);
+    INFO "processing $item";
+    more();
+    INFO "checking if file is segmented";
+    if($self->is_linked($item)) {
+      INFO "generating chapter file";
+      more();
+      my (@segments, @splits);
+      my ($parent, $dir, $suffix)= fileparse($item, qr/\.[mM][kK][vV]/);
+      INFO "loading chapters";
+      more();
+      my $xml = $self->{xml}->load_xml(string => $self->sys($self->{opt}->{mkvext}, 'chapters', $item));
+      open my $out_chapters_orig, '>', catfile($self->{tmpdir}, "$parent-chapters-original.xml");
+      print {$out_chapters_orig} $xml->toString;
+      close $out_chapters_orig;
+      my $offs_time_end = '00:00:00.000000000';
+      my $last_time_end = '00:00:00.000000000';
+      my $offset        = '00:00:00.000000000';
+      my $chaptercount  = 1;
 
-	    INFO "writing chapter temporary file";
-	    open my $out_chapters, '>', catfile($self->{tmpdir}, "$parent-chapters.xml");
-	    print {$out_chapters} $xml->toString;
-	    close $out_chapters;
+      foreach my $edition ($xml->findnodes('//EditionFlagDefault[.=0]')){
+        if(!$self->{opt}->{ignoredefaultflag}) {
+          $edition->parentNode->unbindNode;
+          WARN "non-default chapter dropped";
+        }
+        else {
+          INFO "non-default chapter kept on purpose";
+        }
+      }
+      foreach my $chapter ($xml->findnodes('//ChapterAtom')){
+        my ($ChapterTimeStart) = $chapter->findnodes('./ChapterTimeStart/text()');
+        my ($ChapterTimeEnd)   = $chapter->findnodes('./ChapterTimeEnd/text()');
+        my $ChapterEnabled = ($chapter->findvalue('ChapterFlagEnabled') =~ /^\d+$/)? $chapter->findvalue('ChapterFlagEnabled') : 1;
+        if($chapter->exists('ChapterSegmentUID') && $ChapterEnabled) {
+          my ($SegmentUID, $SegmentELE, $SegmentUIDText);
+          ($SegmentELE) = $chapter->findnodes('./ChapterSegmentUID');
+          ($SegmentUID) = $chapter->findnodes('./ChapterSegmentUID/text()');
+          $SegmentUIDText = $SegmentUID->textContent();
+          if($SegmentELE->getAttribute('format') eq 'hex') {
+            $SegmentUIDText =~ s/\n//g;
+            $SegmentUIDText =~ s/\s//g;
+            $SegmentUIDText =~ s/([a-zA-Z0-9]{2})/ 0x$1/g;
+            $SegmentUIDText =~ s/^\s//;
+          }
+          elsif($SegmentELE->getAttribute('format') eq 'ascii') {
+            $SegmentUIDText =~ s/(.)/sprintf("0x%x ",ord($1))/eg;
+            $SegmentUIDText =~ s/\s$//;
+          }
+          push @segments, {
+            start       => $ChapterTimeStart->textContent(),
+            stop        => $ChapterTimeEnd->textContent(),
+            id          => $SegmentUIDText,
+            split_start => $last_time_end
+          };
+          push @splits, $last_time_end unless $last_time_end eq '00:00:00.000000000';
+          $offset = $self->add_duration_to_timecode($offset, $ChapterTimeEnd->textContent());
+          if($offs_time_end eq '00:00:00.000000000' && $chaptercount > 1) {
+            $ChapterTimeStart->setData($offset);
+            $ChapterTimeEnd->setData($self->add_duration_to_timecode($offset, $ChapterTimeEnd->textContent()));
+          }
+          else {
+            $ChapterTimeStart->setData($offs_time_end);
+            $ChapterTimeEnd->setData($self->add_duration_to_timecode($offs_time_end, $ChapterTimeEnd->textContent()));
+          }
+          $offs_time_end = $ChapterTimeEnd->textContent();
+          $chapter->removeChild($chapter->findnodes('./ChapterSegmentUID'));
+          INFO "external";
+        }
+        else {
+          eval {
+            if(defined $ChapterTimeEnd->textContent() && defined $ChapterTimeStart->textContent()) { }
+            1;
+          } or next;
+          push @segments, {
+            file        => $self->setpart(basename($item), abs_path($item)),
+            start       => $ChapterTimeStart->textContent(),
+            stop        => $ChapterTimeEnd->textContent(),
+            split_start => $ChapterTimeStart->textContent(),
+            split_stop  => $ChapterTimeEnd->textContent() };
+          $last_time_end = $ChapterTimeEnd->textContent();
+          $ChapterTimeStart->setData($self->add_duration_to_timecode($ChapterTimeStart->textContent(), $offset));
+          $ChapterTimeEnd->setData($self->add_duration_to_timecode($ChapterTimeEnd->textContent(), $offset));
+          $offs_time_end = $ChapterTimeEnd->textContent();
+          INFO "internal";
+        }
+        more();
+        INFO "chapter start   " . $ChapterTimeStart->textContent();
+        INFO "chapter end     " . $ChapterTimeEnd->textContent();
+        INFO "offset  start   " . $offset;
+        INFO "offset  end     " . $offs_time_end;
+        INFO "chapter enabled " . $ChapterEnabled;
+        less();
+        $chaptercount++;
+      }
+      less();
 
-	    INFO "looking for segment parts";
-	    more();
-	    if(!defined $self->{segments}) {
-		foreach my $mkv (<*.mkv>) {
-		    $mkv = canonpath(abs_path(catfile($dir, $mkv)));
-		    my ($id, $dur) = $self->mkvinfo($mkv);
-		    $self->{segments}->{$id} = {
-			file => $mkv,
-			dur  => $dur,
-		    }
-		}
-	    }
-	    for (@segments) {
-		next unless defined $_->{id};
-		if(defined $self->{segments}->{$_->{id}} && basename($self->{segments}->{$_->{id}}->{file}) ne basename($item)) {
-		    $_->{file} = $self->setpart(basename($self->{segments}->{$_->{id}}->{file}), $self->{segments}->{$_->{id}}->{file});
-		    INFO "found part $_->{file}";
-		}
-	    }
-	    less();
+      INFO "writing chapter temporary file";
+      open my $out_chapters, '>', catfile($self->{tmpdir}, "$parent-chapters.xml");
+      print {$out_chapters} $xml->toString;
+      close $out_chapters;
 
-	    more();
-	    INFO "checking that all required segments were found";
-	    my $okay_to_proceed = 1;
-	    for (@segments) {
-		if(defined $_->{id} && !defined $_->{file}) {
-		    WARN "missing segment: $_->{id}";
-		    $okay_to_proceed = 0;
-		}
-	    }
-	    if($okay_to_proceed) {
-		INFO "all segments found";
-	    }
-	    else {
-		WARN "missing segments";
-		less();
-		return;
-	    }
-	    less();
+      INFO "looking for segment parts";
+      more();
+      if(!defined $self->{segments}) {
+        foreach my $mkv (<*.mkv>) {
+          $mkv = canonpath(abs_path(catfile($dir, $mkv)));
+          my ($id, $dur)= $self->mkvinfo($mkv);
+          $self->{segments}->{$id} = {
+            file => $mkv,
+            dur  => $dur,
+          };
+        }
+      }
+      for (@segments) {
+        next unless defined $_->{id};
+        if(defined $self->{segments}->{ $_->{id} } && basename($self->{segments}->{ $_->{id} }->{file})ne basename($item)) {
+          $_->{file} = $self->setpart(basename($self->{segments}->{ $_->{id} }->{file} ), $self->{segments}->{ $_->{id} }->{file});
+          INFO "found part $_->{file}";
+        }
+      }
+      less();
 
-	    INFO "extracting attachments";
-	    more();
-	    foreach my $seg (@segments) {
-		my $file = "$seg->{file}";
-		my $in = 0;
-		my ($N, $T, $D, $U);
-		TRACE "FILE $file";
-		for(split /\n/, $self->sys($self->{opt}->{mkvinfo}, $file)) {
-		    chomp;
-		    if ($_ =~ /^\| \+ Attached/) {
-			$in = 1;
-		    }
-		    elsif($in && $_ =~ /File name: (.*)/) {
-			$N = $1;
-		    }
-		    elsif($in && $_ =~ /Mime type: (.*)/) {
-			$T = $1;
-		    }
-		    elsif($in && $_ =~ /File data, size: (.*)/) {
-			$D = $1;
-		    }
-		    elsif($in && $_ =~ /File UID: (.*)/) {
-			$U = $1;
-		    }
-		    if (defined $N && defined $T && defined $D && defined $U) {
-			if(!-f "$self->{attachdir}/$N") {
-			    push @{$seg->{attachments}}, { name => $N, type => $T, data => $D, UID => $U };
-			    INFO "found $N";
-			}
-			else {
-			    DEBUG "skipping $N";
-			}
-			undef $N;
-			undef $T;
-			undef $D;
-			undef $U;
-		    }
-		}
-		if (defined $seg->{attachments} && @{$seg->{attachments}} > 0) {
-		    INFO "extracting attachments...";
-		    my $dir       = cwd();
-		    TRACE "chdir $self->{attachdir}";
-		    chdir($self->{attachdir});
-		    $self->sys($self->{opt}->{mkvext}, 'attachments', $file, (1..$#{$seg->{attachments}}+1));
-		    chdir($dir);
-		}
-	    }
-	    less();
+      more();
+      INFO "checking that all required segments were found";
+      my $okay_to_proceed = 1;
+      for (@segments) {
+        if(defined $_->{id} && !defined $_->{file}) {
+          WARN "missing segment: $_->{id}";
+          $okay_to_proceed = 0;
+        }
+      }
+      if ($okay_to_proceed) {
+        INFO "all segments found";
+      }
+      else {
+        WARN "missing segments";
+        less();
+        return;
+      }
+      less();
 
-	    my @atts;
-	    opendir my $D, $self->{attachdir} or LOGDIE "failed to open attachment directory: $!";
-	    while(my $item = readdir($D)) {
-		my $F = catfile($self->{attachdir}, $item);
-		if(-f $F) {
-		    push @atts, ('--attachment-mime-type', 'application/x-truetype-font', '--attach-file', $F);
-		}
-	    }
-	    closedir $D;
-
-	    more();
-	    if(scalar(@splits) > 0) {
-		INFO "creating " . scalar(@splits+1) . " splits from $item";
-		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-o', catfile($self->{partsdir}, "split-%03d.mkv"), $item, '--split', 'timecodes:' . join(',',@splits));
-	    }
-	    less();
-
-	    INFO "setting parts";
-	    more();
-	    my (@parts, $LAST);
-	    my $count = 1;
-	    foreach my $segment (@segments) {
-		if(defined $segment->{id} && $segment->{start} =~ /^00:00:00\./ || ($LAST ne $segment->{file} && scalar(@splits) == 0)) {
-		    DEBUG "part $segment->{file}";
-		    push @parts, $segment->{file};
-		}
-		elsif($LAST ne $segment->{file}) {
-		    my $f = catfile($self->{partsdir}, sprintf("split-%03d.mkv",$count));
-		    DEBUG "part $f";
-		    push @parts, $f;
-		    $count++;
-		}
-		$LAST = $segment->{file};
-	    }
-	    less();
-
-	    my $subs;
-	    if($self->{opt}->{fixsubtitles}) {
-		INFO "extracting subs";
-		more();
-		foreach my $part (@parts) {
-		    DEBUG "$part";
-		    my $in  = 0;
-		    my $sub = 0;
-		    my ($N, $T, $D, $U);
-		    for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, $part)) {
-			chomp;
-			if ($_ =~ /^\| \+ A track/) {
-			    $in = 1;
-			    undef $N;
-			    undef $T;
-			    undef $D;
-			    undef $U;
-			    $sub = 0;
-			}
-			elsif($in && $_ =~ /Track type: subtitles/) {
-			    $sub = 1;
-			}
-			elsif($in && $_ =~ /Track number: .*: (\d)\)$/) {
-			    $T = $1;
-			}
-			if (defined $in && $sub && $T) {
-			    my $sf = catfile($self->{subtitlesdir}, basename($part)."-$T.ass");
-			    $self->sys($self->{opt}->{mkvext}, 'tracks', $part, "$T:$sf");
-			    push @{$subs->{$part}}, $sf;
-			    undef $T;
-			    $in  = 0;
-			    $sub = 0;
-			}
-		    }
-		}
-		less();
-
-		INFO "making substyles unique";
-		more();
-		my $styles;
-		foreach my $f (keys %$subs) {
-		    push @$styles, @{$self->uniquify_substyles($subs->{$f})};
-		}
-		less();
-
-		INFO "mashing unique substyles to all parts";
-		more();
-		foreach my $f (keys %$subs) {
-		    $self->mush_substyles($subs->{$f}, $styles);
-		}
-		less();
-
-		INFO "remuxing subtitles";
-		more();
-		foreach my $f (keys %$subs) {
-		    DEBUG $f;
-		    my @stracks;
-		    foreach my $T (@{$subs->{$f}}) {
-			push @stracks, $T;
-		    }
-		    $self->sys($self->{opt}->{mkvmerge}, '-o', "$f-fixsubs.mkv", '--no-chapters', '--no-subs', $f, @stracks, @atts);
-		    $self->replace($f, "$f-fixsubs.mkv");
-		}
-		less();
-	    }
-
-	    if($self->{opt}->{fixvideo} || $self->{opt}->{fixaudio}) {
-		INFO "encoding parts";
-		more();
-		foreach my $part (@parts) {
-		    my @vopt = qw/-vcodec copy/;
-		    my @aopt = qw/-map 0 -acodec copy/;
-		    WARN $part;
-		    if ($self->{opt}->{fixvideo}) {
-			@vopt   = undef;
-			my $VV = $self->parseoptvars($self->ffdetails($part));
-			$self->{opt}->{fixvideotemplate} =~ s/\t/ /g;
-			$self->{opt}->{fixvideotemplate} =~ s/  / /g;
-			do {
-			    $self->{opt}->{fixvideotemplate} =~ s/{$_}/$VV->{$_}/ig;
-			} for keys %$VV;
-			@vopt = split / /, $self->{opt}->{fixvideotemplate};
-		    }
-		    if ($self->{opt}->{fixaudio}) {
-			@aopt = undef;
-			$self->{opt}->{fixaudiotemplate} =~ s/\t/ /g;
-			$self->{opt}->{fixaudiotemplate} =~ s/  / /g;
-			@aopt = split / /, $self->{opt}->{fixaudiotemplate};
-		    }
-		    $self->sys($self->{opt}->{ffmpeg}, '-i', $part, @vopt, @aopt, "$part-fixed.mkv");
-		    $self->replace($part, "$part-fixed.mkv");
-		}
-		less();
-	    }
-
-	    INFO "building file";
-	    more();
-	    my @PRTS;
-	    foreach my $part (@parts) {
-		push @PRTS, $part;
-		push @PRTS, '+';
-	    }
-	    pop @PRTS;
-	    if($self->{opt}->{chapters}) {
-		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', catfile($self->{tmpdir}, "$parent-chapters.xml"), '-o', catfile($self->{encodesdir}, basename($item)), @PRTS);
-	    }
-	    else {
-		$self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', catfile($self->{tmpdir}, "$parent-chapters.xml"), '-o', catfile($self->{encodesdir}, basename($item)), @PRTS);
-	    }
-	    less();
-
-	    INFO "fixing subs, again... (maybe an mkvmerge issue?)";
-	    more();
-	    if($self->{opt}->{fixsubtitles}) {
-		my @FS;
-		my $in  = 0;
-		my $sub = 0;
-		my ($N, $T, $D, $U);
-		for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, catfile($self->{encodesdir}, basename($item)))) {
-		    chomp;
-		    if ($_ =~ /^\| \+ A track/) {
-			$in = 1;
-			undef $N;
-			undef $T;
-			undef $D;
-			undef $U;
-			$sub = 0;
-		    }
-		    elsif($in && $_ =~ /Track type: subtitles/) {
-			$sub = 1;
-		    }
-		    elsif($in && $_ =~ /Track number: .*: (\d)\)$/) {
-			$T = $1;
-		    }
-		    if (defined $in && $sub && $T) {
-			$self->sys($self->{opt}->{mkvext}, 'tracks', catfile($self->{encodesdir}, basename($item)), "$T:".catfile($self->{encodesdir}, "$T.ass"));
-			push @FS, catfile($self->{encodesdir}, "$T.ass");
-			undef $T;
-			$in  = 0;
-			$sub = 0;
-		    }
-		}
-		$self->sys($self->{opt}->{mkvmerge}, '-o', catfile($self->{encodesdir}, "fixed." . basename($item)), '-S', catfile($self->{encodesdir}, basename($item)), @FS);
-		$self->replace(catfile($self->{encodesdir}, basename($item)), catfile($self->{encodesdir}, "fixed." . basename($item)));
-	    }
-	    less();
-	    INFO "moving built file to final destination";
-	    more();
-            if(-f catfile($self->{encodesdir}, basename($item))) {
-	        make_path($self->{opt}->{outdir}, { verbose => 0 });
-	        move(catfile($self->{encodesdir}, basename($item)), $self->{opt}->{outdir});
+      INFO "extracting attachments";
+      more();
+      foreach my $seg (@segments) {
+        my $file = "$seg->{file}";
+        my $in   = 0;
+        my ($N, $T, $D, $U);
+        TRACE "FILE $file";
+        for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, $file)){
+          chomp;
+          if($_ =~ /^\| \+ Attached/) {
+            $in = 1;
+          }
+          elsif($in && $_ =~ /File name: (.*)/) {
+            $N = $1;
+          }
+          elsif($in && $_ =~ /Mime type: (.*)/) {
+            $T = $1;
+          }
+          elsif($in && $_ =~ /File data, size: (.*)/) {
+            $D = $1;
+          }
+          elsif($in && $_ =~ /File UID: (.*)/) {
+            $U = $1;
+          }
+          if(defined $N && defined $T && defined $D && defined $U) {
+            if(!-f "$self->{attachdir}/$N") {
+              push @{ $seg->{attachments} }, { name => $N, type => $T, data => $D, UID => $U };
+              INFO "found $N";
             }
             else {
-                WARN "file failed to build";
+              DEBUG "skipping $N";
             }
-	    less();
-	}
-	$self->mktmp() if $self->{opt}->{cleanup};
-	less();
-    }
+            undef $N;
+            undef $T;
+            undef $D;
+            undef $U;
+          }
+        }
+        if(defined $seg->{attachments} && @{ $seg->{attachments} } > 0) {
+          INFO "extracting attachments...";
+          my $dir = cwd();
+          TRACE "chdir $self->{attachdir}";
+          chdir($self->{attachdir});
+          $self->sys($self->{opt}->{mkvext}, 'attachments', $file, (1 .. $#{ $seg->{attachments} } + 1));
+          chdir($dir);
+        }
+      }
+      less();
 
-    sub parseoptvars {
-	my $self = shift;
-	my $vars = shift;
-	my $V;
-	foreach my $key (keys %$vars) {
-	    $V->{"var_$key"} = "$vars->{$key}";
-	}
-	foreach my $var (grep($_ =~ /^var_/, keys %{$self->{opt}})) {
-	    $V->{$var}    = "$self->{opt}->{$var}";
-	    do { $V->{$_} = undef unless defined $V->{$_} }
-		for $V->{$var} =~ /([a-z]\w+(?:'[a-z]\w+)*)/ig;
-	}
-	for(0..(int(scalar(keys %$V)) * int(scalar(keys %$V)))) {
-	    foreach my $var (keys %$V) {
-		foreach my $word ($V->{$var} =~ /([a-z]\w+(?:'[a-z]\w+)*)/ig) {
-		    if(defined $V->{$word}) {
-			$V->{$var} =~ s/$word/$V->{$word}/;
-			if($V->{$var} !~ /[a-z]/i) {
-			    $V->{$var} = int((eval $V->{$var})+.5);
-			}
-		    }
-		}
-	    }
-	}
-	return $V;
-    }
+      my @atts;
+      opendir my $D, $self->{attachdir} or LOGDIE "failed to open attachment directory: $!";
+      while (my $item = readdir($D)){
+        my $F = catfile($self->{attachdir}, $item);
+        if(-f $F) {
+          push @atts, ('--attachment-mime-type', 'application/x-truetype-font', '--attach-file', $F);
+        }
+      }
+      closedir $D;
 
-    sub ffdetails {
-	my $self     = shift;
-	my $file     = shift;
-	my $duration = 0;
-	my $size     = int((-s $file)/1024+.5);
-	my $br       = 0;
-	foreach my $line (split /\n/, $self->sys($self->{opt}->{ffmpeg}, '-i', $file)) {
-	    if($line =~ /duration: (\d+):(\d+):(\d+\.\d+),/i) {
-		$duration = ($1*3600)+($2*60)+int($3+.5);
-		DEBUG "duration [$1:$2:$3] = $duration seconds";
-	    }
-	    if($line =~ /duration.*bitrate: (\d+) k/i) {
-		$br = $1;
-		DEBUG "bitrate ${br}k";
-	    }
-	}
-	return {
-	    bitrate  => $br,
-	    size     => $size,
-	    duration => $duration,
-	};
-    }
+      more();
+      if(scalar(@splits) > 0) {
+        INFO "creating " . scalar(@splits + 1). " splits from $item";
+        $self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-o', catfile($self->{partsdir}, "split-%03d.mkv"), $item, '--split', 'timecodes:' . join(',', @splits));
+      }
+      less();
 
-    sub replace {
-	my $self   = shift;
-	my $dest   = shift;
-	my $source = shift;
-	unlink($dest);
-	move($source, $dest);
-    }
+      INFO "setting parts";
+      more();
+      my (@parts, $LAST);
+      my $count = 1;
+      foreach my $segment (@segments) {
+        if(defined $segment->{id} && $segment->{start} =~ /^00:00:00\./ || ($LAST ne $segment->{file} && scalar(@splits) == 0)) {
+          DEBUG "part $segment->{file}";
+          push @parts, $segment->{file};
+        }
+        elsif($LAST ne $segment->{file}) {
+          my $f = catfile($self->{partsdir}, sprintf("split-%03d.mkv", $count));
+          DEBUG "part $f";
+          push @parts, $f;
+          $count++;
+        }
+        $LAST = $segment->{file};
+      }
+      less();
 
-    sub is_linked {
-	my $self   = shift;
-	my $item   = shift;
-	my $linked = 0;
-	more();
-	foreach my $line (split /\n/, $self->sys($self->{opt}->{mkvext}, 'chapters', $item)) {
-	    if($line =~ /<ChapterSegmentUID/i) {
-		$linked = 1;
-	    }
-	}
-	if($linked) {
-	    WARN "file contains segmented chapters";
-	}
-	else {
-	    INFO "file does not contain segmented chapters";
-	}
-	less();
-	return $linked;
-    }
+      my $subs;
+      if($self->{opt}->{fixsubtitles}) {
+        INFO "extracting subs";
+        more();
+        foreach my $part (@parts) {
+          DEBUG "$part";
+          my $in  = 0;
+          my $sub = 0;
+          my ($N, $T, $D, $U);
+          for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, $part)){
+            chomp;
+            if($_ =~ /^\| \+ A track/) {
+              $in = 1;
+              undef $N;
+              undef $T;
+              undef $D;
+              undef $U;
+              $sub = 0;
+            }
+            elsif($in && $_ =~ /Track type: subtitles/) {
+              $sub = 1;
+            }
+            elsif($in && $_ =~ /Track number: .*: (\d)\)$/) {
+              $T = $1;
+            }
+            if(defined $in && $sub && $T) {
+              my $sf = catfile($self->{subtitlesdir}, basename($part) . "-$T.ass");
+              $self->sys($self->{opt}->{mkvext}, 'tracks', $part, "$T:$sf");
+              push @{ $subs->{$part} }, $sf;
+              undef $T;
+              $in  = 0;
+              $sub = 0;
+            }
+          }
+        }
+        less();
 
-    sub setpart {
-	my $self = shift;
-	my $link = shift;
-	my $file = shift;
-	my $part = catfile($self->{partsdir}, $link);
-	DEBUG "copying part $file to $part";
-	copy($file, $part);
-	return $part;
-    }
+        INFO "making substyles unique";
+        more();
+        my $styles;
+        foreach my $f (keys %$subs){
+          push @$styles, @{ $self->uniquify_substyles($subs->{$f})};
+        }
+        less();
 
-    sub uniquify_substyles {
-	my $self = shift;
-	my $S    = shift;
-	my @styles;
-	foreach my $T (@$S) {
-	    DEBUG $T;
-	    my $uniq = crc32($T);
-	    open my $O, '>', "$T.new";
-	    open my $F, '<', $T;
-	    my $in = 0;
-	    my $di = 0;
-	    my $key;
-	    while(my $line = <$F>) {
-		if ($line =~ /^\[/ && $line =~ /^\[V4\+ Styles/) {
-		    $in = 1;
-		}
-		elsif(($in||$di) && !defined $key && $line =~ /^Format:/i) {
-		    my $test = "$line";
-		    $test =~ s/ //g;
-		    $test =~ s/^format://i;
-		    my(@parts) = split /,/, $test;
-		    my $c      = 0;
-		    foreach my $part (@parts) {
-			if ($in && $part =~ /^name$/i) {
-			    $key = $c;
-			}
-			elsif($di && $part =~ /^style$/i) {
-			    $key = $c;
-			}
-			$c++;
-		    }
-		}
-		elsif($in && defined $key && $line =~ /^style:/i) {
-		    $line =~ s/^style:\s+?//i;
-		    my(@parts) = split /,/, $line;
-		    $parts[$key] = "$parts[$key] u$uniq";
-		    $line = "Style: " . join(',', @parts);
-		    push @styles, $line;
-		    DEBUG $line;
-		}
-		elsif($line =~ /^\[Events/i) {
-		    $in  = 0;
-		    $di  = 1;
-		    $key = undef;
-		}
-		elsif($di && defined $key && $line =~ /^dialogue:/i) {
-		    $line =~ s/^dialogue: //i;
-		    my(@parts) = split /,/, $line;
-		    $parts[$key] = "$parts[$key] u$uniq";
-		    $line = "Dialogue: " . join(',', @parts);
-		}
-		print $O $line;
-	    }
-	    close $F;
-	    close $O;
-	    unlink $T;
-	    move("$T.new", $T);
-	}
-	return \@styles;
-    }
+        INFO "mashing unique substyles to all parts";
+        more();
+        foreach my $f (keys %$subs){
+          $self->mush_substyles($subs->{$f}, $styles);
+        }
+        less();
 
-    sub mush_substyles {
-	my $self   = shift;
-	my $S      = shift;
-	my $styles = shift;
-	foreach my $T (@$S) {
-	    open my $F, '<', $T;
-	    my @lines = <$F>;
-	    close $F;
-	    open my $F, '>', $T;
-	    my $in = 0;
-	    foreach my $line (@lines) {
-		if ($line =~ /^\[/ && $line =~ /^\[V4\+ Styles/) {
-		    $in = 1;
-		    print $F $line;
-		}
-		elsif($in && $line =~ /^format:/i) {
-		    print $F $line;
-		    do {
-			print $F $_;
-		    } for @$styles;
-		}
-		elsif($in && $line =~ /^style:/i) {
-		    #do nothing
-		}
-		elsif($in && $line =~ /^\[/) {
-		    $in = 0;
-		    print $F $line;
-		}
-		elsif(defined $self->{opt}->{playresx} && $line =~ /^PlayResX:/) {
-		    print $F "PlayResX: $self->{opt}->{playresx}\n";
-		}
-		elsif(defined $self->{opt}->{playresy} && $line =~ /^PlayResY:/) {
-		    print $F "PlayResY: $self->{opt}->{playresy}\n";
-		}
-		else {
-		    print $F $line;
-		}
-	    }
-	    close $F;
-	}
-    }
+        INFO "remuxing subtitles";
+        more();
+        foreach my $f (keys %$subs){
+          DEBUG $f;
+          my @stracks;
+          foreach my $T (@{ $subs->{$f} }){
+            push @stracks, $T;
+          }
+          $self->sys($self->{opt}->{mkvmerge}, '-o', "$f-fixsubs.mkv", '--no-chapters', '--no-subs', $f, @stracks, @atts);
+          $self->replace($f, "$f-fixsubs.mkv");
+        }
+        less();
+      }
 
-    sub mkvinfo {
-	my $self = shift;
-	my $file = shift;
-	my $id  = '';
-	my $dur = '';
-	for(split /\n/, $self->sys($self->{opt}->{mkvinfo}, $file)) {
-	    chomp;
-	    if ($_ =~ /Segment[ \-]UID:/) {
-		$_ =~ /Segment[ \-]UID:([a-zA-Z0-9\s]+)$/;
-		$id = $1;
-		$id =~ s/^\s+//g;
-		$id =~ s/\s+$//g;
-	    }
-	    elsif($_ =~ /^\| \+ Duration:/) {
-		$_   =~ /^\| \+ Duration:.*\((.*)\)/;
-		$dur = $1;
-	    }
-	}
-	return ($id, $dur);
-    }
+      if($self->{opt}->{fixvideo} || $self->{opt}->{fixaudio}) {
+        INFO "encoding parts";
+        more();
+        foreach my $part (@parts) {
+          my @vopt = qw/-vcodec copy/;
+          my @aopt = qw/-map 0 -acodec copy/;
+          WARN $part;
+          if($self->{opt}->{fixvideo}) {
+            @vopt = undef;
+            my $VV = $self->parseoptvars($self->ffdetails($part));
+            $self->{opt}->{fixvideotemplate} =~ s/\t/ /g;
+            $self->{opt}->{fixvideotemplate} =~ s/  / /g;
+            do {
+              $self->{opt}->{fixvideotemplate} =~ s/{$_}/$VV->{$_}/ig;
+              }
+              for keys %$VV;
+            @vopt = split / /, $self->{opt}->{fixvideotemplate};
+          }
+          if($self->{opt}->{fixaudio}) {
+            @aopt = undef;
+            $self->{opt}->{fixaudiotemplate} =~ s/\t/ /g;
+            $self->{opt}->{fixaudiotemplate} =~ s/  / /g;
+            @aopt = split / /, $self->{opt}->{fixaudiotemplate};
+          }
+          $self->sys($self->{opt}->{ffmpeg}, '-i', $part, @vopt, @aopt, "$part-fixed.mkv");
+          $self->replace($part, "$part-fixed.mkv");
+        }
+        less();
+      }
 
-    sub add_duration_to_timecode {
-	my $self = shift;
-	my $time = shift;
-	my $dur  = shift;
-	my ($th, $tm, $ts) = split /:/,  $time;
-	my ($dh, $dm, $ds) = split /:/,  $dur;
-	$ts += ($ds + 0.000000001);
-	if($ts >= 60.000000000) {
-	    $ts = $ts - 60.000000000;
-	    $dm++;
-	}
-	$tm += $dm;
-	if($tm >= 60) {
-	    $tm = $tm - 60;
-	    $dh++;
-	}
-	$th += $dh;
-	return sprintf("%02d:%02d:%02.9f",$th,$tm,$ts);
-    }
+      INFO "building file";
+      more();
+      my @PRTS;
+      foreach my $part (@parts) {
+        push @PRTS, $part;
+        push @PRTS, '+';
+      }
+      pop @PRTS;
+      if($self->{opt}->{chapters}) {
+        $self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', catfile($self->{tmpdir}, "$parent-chapters.xml" ), '-o', catfile( $self->{encodesdir}, basename($item) ), @PRTS);
+      }
+      else {
+        $self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', catfile($self->{tmpdir}, "$parent-chapters.xml" ), '-o', catfile( $self->{encodesdir}, basename($item) ), @PRTS);
+      }
+      less();
 
-    sub sys {
-	my $self   = shift;
-	my @app    = @_;
-	my $buf;
-	more();
-	TRACE "sys > @app";
-	run3(\@app, undef, sub {
-	    my $line = shift;
-	    TRACE "sys < $line";
-	    $buf .= $line;
-	}, sub {
-		my $line = shift;
-		TRACE "sys !! $line";
-		$buf .= $line;
-	});
-	less();
-	return $buf;
+      INFO "fixing subs, again... (maybe an mkvmerge issue?)";
+      more();
+      if($self->{opt}->{fixsubtitles}) {
+        my @FS;
+        my $in  = 0;
+        my $sub = 0;
+        my ($N, $T, $D, $U);
+        for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, catfile($self->{encodesdir}, basename($item)))){
+          chomp;
+          if($_ =~ /^\| \+ A track/) {
+            $in = 1;
+            undef $N;
+            undef $T;
+            undef $D;
+            undef $U;
+            $sub = 0;
+          }
+          elsif($in && $_ =~ /Track type: subtitles/) {
+            $sub = 1;
+          }
+          elsif($in && $_ =~ /Track number: .*: (\d)\)$/) {
+            $T = $1;
+          }
+          if(defined $in && $sub && $T) {
+            $self->sys($self->{opt}->{mkvext}, 'tracks', catfile($self->{encodesdir}, basename($item)), "$T:" . catfile($self->{encodesdir}, "$T.ass"));
+            push @FS, catfile($self->{encodesdir}, "$T.ass");
+            undef $T;
+            $in  = 0;
+            $sub = 0;
+          }
+        }
+        $self->sys($self->{opt}->{mkvmerge}, '-o', catfile($self->{encodesdir}, "fixed." . basename($item) ), '-S', catfile( $self->{encodesdir}, basename($item) ), @FS);
+        $self->replace(catfile($self->{encodesdir}, basename($item)), catfile($self->{encodesdir}, "fixed." . basename($item)));
+      }
+      less();
+      INFO "moving built file to final destination";
+      more();
+      if(-f catfile($self->{encodesdir}, basename($item))) {
+        make_path($self->{opt}->{outdir}, { verbose => 0 });
+        move(catfile($self->{encodesdir}, basename($item) ), $self->{opt}->{outdir});
+      }
+      else {
+        WARN "file failed to build";
+      }
+      less();
     }
+    $self->mktmp() if $self->{opt}->{cleanup};
+    less();
+  }
 
-    sub more {
-	Log::Log4perl::NDC->push("  ");
+  sub parseoptvars {
+    my $self = shift;
+    my $vars = shift;
+    my $V;
+    foreach my $key (keys %$vars){
+      $V->{"var_$key"} = "$vars->{$key}";
     }
+    foreach my $var (grep($_ =~ /^var_/, keys %{ $self->{opt} })){
+      $V->{$var} = "$self->{opt}->{$var}";
+      do { $V->{$_} = undef unless defined $V->{$_} }
+        for $V->{$var} =~ /([a-z]\w+(?:'[a-z]\w+)*)/ig;
+    }
+    for (0 .. (int(scalar(keys %$V ))* int(scalar( keys %$V)))){
+      foreach my $var (keys %$V){
+        foreach my $word ($V->{$var} =~ /([a-z]\w+(?:'[a-z]\w+)*)/ig){
+          if(defined $V->{$word}) {
+            $V->{$var} =~ s/$word/$V->{$word}/;
+            if($V->{$var} !~ /[a-z]/i) {
+              $V->{$var} = int((eval $V->{$var})+ .5);
+            }
+          }
+        }
+      }
+    }
+    return $V;
+  }
 
-    sub less {
-	Log::Log4perl::NDC->pop();
+  sub ffdetails {
+    my $self     = shift;
+    my $file     = shift;
+    my $duration = 0;
+    my $size     = int((-s $file)/ 1024 + .5);
+    my $br       = 0;
+    foreach my $line (split /\n/, $self->sys($self->{opt}->{ffmpeg}, '-i', $file)){
+      if($line =~ /duration: (\d+):(\d+):(\d+\.\d+),/i) {
+        $duration = ($1 * 3600 ) + ($2 * 60)+ int($3 + .5);
+        DEBUG "duration [$1:$2:$3] = $duration seconds";
+      }
+      if($line =~ /duration.*bitrate: (\d+) k/i) {
+        $br = $1;
+        DEBUG "bitrate ${br}k";
+      }
     }
+    return {
+      bitrate  => $br,
+      size     => $size,
+      duration => $duration,
+    };
+  }
+
+  sub replace {
+    my $self   = shift;
+    my $dest   = shift;
+    my $source = shift;
+    unlink($dest);
+    move($source, $dest);
+  }
+
+  sub is_linked {
+    my $self   = shift;
+    my $item   = shift;
+    my $linked = 0;
+    more();
+    foreach my $line (split /\n/, $self->sys($self->{opt}->{mkvext}, 'chapters', $item)){
+      if($line =~ /<ChapterSegmentUID/i) {
+        $linked = 1;
+      }
+    }
+    if ($linked) {
+      WARN "file contains segmented chapters";
+    }
+    else {
+      INFO "file does not contain segmented chapters";
+    }
+    less();
+    return $linked;
+  }
+
+  sub setpart {
+    my $self = shift;
+    my $link = shift;
+    my $file = shift;
+    my $part = catfile($self->{partsdir}, $link);
+    DEBUG "copying part $file to $part";
+    copy($file, $part);
+    return $part;
+  }
+
+  sub uniquify_substyles {
+    my $self = shift;
+    my $S    = shift;
+    my @styles;
+    foreach my $T (@$S) {
+      DEBUG $T;
+      my $uniq = crc32($T);
+      open my $O, '>', "$T.new";
+      open my $F, '<', $T;
+      my $in = 0;
+      my $di = 0;
+      my $key;
+      while (my $line = <$F>){
+
+        if($line =~ /^\[/ && $line =~ /^\[V4\+ Styles/) {
+          $in = 1;
+        }
+        elsif(($in || $di)&& !defined $key && $line =~ /^Format:/i) {
+          my $test = "$line";
+          $test =~ s/ //g;
+          $test =~ s/^format://i;
+          my (@parts) = split /,/, $test;
+          my $c = 0;
+          foreach my $part (@parts) {
+            if($in && $part =~ /^name$/i) {
+              $key = $c;
+            }
+            elsif($di && $part =~ /^style$/i) {
+              $key = $c;
+            }
+            $c++;
+          }
+        }
+        elsif($in && defined $key && $line =~ /^style:/i) {
+          $line =~ s/^style:\s+?//i;
+          my (@parts) = split /,/, $line;
+          $parts[$key] = "$parts[$key] u$uniq";
+          $line = "Style: " . join(',', @parts);
+          push @styles, $line;
+          DEBUG $line;
+        }
+        elsif($line =~ /^\[Events/i) {
+          $in  = 0;
+          $di  = 1;
+          $key = undef;
+        }
+        elsif($di && defined $key && $line =~ /^dialogue:/i) {
+          $line =~ s/^dialogue: //i;
+          my (@parts) = split /,/, $line;
+          $parts[$key] = "$parts[$key] u$uniq";
+          $line = "Dialogue: " . join(',', @parts);
+        }
+        print $O $line;
+      }
+      close $F;
+      close $O;
+      unlink $T;
+      move("$T.new", $T);
+    }
+    return \@styles;
+  }
+
+  sub mush_substyles {
+    my $self   = shift;
+    my $S      = shift;
+    my $styles = shift;
+    foreach my $T (@$S) {
+      open my $F, '<', $T;
+      my @lines = <$F>;
+      close $F;
+      open my $F, '>', $T;
+      my $in = 0;
+      foreach my $line (@lines) {
+        if($line =~ /^\[/ && $line =~ /^\[V4\+ Styles/) {
+          $in = 1;
+          print $F $line;
+        }
+        elsif($in && $line =~ /^format:/i) {
+          print $F $line;
+          do {
+            print $F $_;
+            }
+            for @$styles;
+        }
+        elsif($in && $line =~ /^style:/i) {
+
+          #do nothing
+        }
+        elsif($in && $line =~ /^\[/) {
+          $in = 0;
+          print $F $line;
+        }
+        elsif(defined $self->{opt}->{playresx} && $line =~ /^PlayResX:/) {
+          print $F "PlayResX: $self->{opt}->{playresx}\n";
+        }
+        elsif(defined $self->{opt}->{playresy} && $line =~ /^PlayResY:/) {
+          print $F "PlayResY: $self->{opt}->{playresy}\n";
+        }
+        else {
+          print $F $line;
+        }
+      }
+      close $F;
+    }
+  }
+
+  sub mkvinfo {
+    my $self = shift;
+    my $file = shift;
+    my $id   = '';
+    my $dur  = '';
+    for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, $file)){
+      chomp;
+      if($_ =~ /Segment[ \-]UID:/) {
+        $_ =~ /Segment[ \-]UID:([a-zA-Z0-9\s]+)$/;
+        $id = $1;
+        $id =~ s/^\s+//g;
+        $id =~ s/\s+$//g;
+      }
+      elsif($_ =~ /^\| \+ Duration:/) {
+        $_ =~ /^\| \+ Duration:.*\((.*)\)/;
+        $dur = $1;
+      }
+    }
+    return ($id, $dur);
+  }
+
+  sub add_duration_to_timecode {
+    my $self = shift;
+    my $time = shift;
+    my $dur  = shift;
+    my ($th, $tm, $ts)= split /:/, $time;
+    my ($dh, $dm, $ds)= split /:/, $dur;
+    $ts += ($ds + 0.000000001);
+    if($ts >= 60.000000000) {
+      $ts = $ts - 60.000000000;
+      $dm++;
+    }
+    $tm += $dm;
+    if($tm >= 60) {
+      $tm = $tm - 60;
+      $dh++;
+    }
+    $th += $dh;
+    return sprintf("%02d:%02d:%02.9f", $th, $tm, $ts);
+  }
+
+  sub sys {
+    my $self = shift;
+    my @app  = @_;
+    my $buf;
+    more();
+    TRACE "sys > @app";
+    run3(
+      \@app,
+      undef,
+      sub {
+        my $line = shift;
+        TRACE "sys < $line";
+        $buf .= $line;
+      },
+      sub {
+        my $line = shift;
+        TRACE "sys !! $line";
+        $buf .= $line;
+      } );
+    less();
+    return $buf;
+  }
+
+  sub more {
+    Log::Log4perl::NDC->push("  ");
+  }
+
+  sub less {
+    Log::Log4perl::NDC->pop();
+  }
 
 }

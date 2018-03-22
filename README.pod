@@ -83,6 +83,7 @@ This script requires:
    --playresy             Same as above, but for the Y axis (vertical).
    --ignoredefaultflag    Occassionally the default chapter flag exists, but *all* chapters are disabled which confuses the script. Enable on those rare occassions.
    --(no-)chapters        The script does its best to adjust the chapters, but it's not quite perfect. This disables including chapters in the final file.
+   --edition              Manually specify which edition to keep. Must combine with ignoredefaultflag if non-default edition. Yes, this is pointless otherwise.
    --ffmpeg [path]        Specify a path to the ffmpeg binary to use.
    --mkvext [path]        Specify a path to the mkvextract binary to use.
    --mkvinfo [path]       Specify a path to the mkvinfo binary to use.

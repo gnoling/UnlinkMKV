@@ -1,10 +1,17 @@
+=encoding utf8
 =head1 NAME
 
 unlinkmkv - automate the tedious process of unlinking segmented MKV files.
 
 =head2 WHAT?
 
-A segmented MKV is an MKV that utilizes external additional MKV files to create a "whole" MKV. A common example is that when an anime series uses the same introduction and ending in every episode, sometimes the encoder will break the introduction and ending into their own MKV files, and then "link" to the segments as chapters in each episode's individual MKV. The problem is that very few players/filters/splitters support this, so this script automates the mkvtoolnix tools to "Rebuild" each episode into "complete" MKVs.
+A segmented MKV is an MKV that utilizes external additional MKV files to create
+a "whole" MKV. A common example is that when an anime series uses the same
+introduction and ending in every episode, sometimes the encoder will break the
+introduction and ending into their own MKV files, and then "link" to the
+segments as chapters in each episode's individual MKV. The problem is that very
+few players/filters/splitters support this, so this script automates the
+mkvtoolnix tools to "rebuild" each episode into "complete" MKVs.
 
 =head2 VERSION
 
@@ -12,28 +19,51 @@ version 1.01
 
 =head2 SYNOPSIS
 
-Using UnlinkMKV to unlink segments, the chapters when viewing the video ARE retained. The MKV spec requires that the segmented files are in the same directory, so does this. It doesn't matter if you rename the files as long as all required files are in the same directory as the one being processed, segmenting is based on internal IDs. Depending on how the original files were made, you may need to use the fixaudio and fixvideo options.
+When using C<unlinkmkv> to unlink segments, the chapters when viewing the video
+B<are> retained. The MKV spec requires that the segmented files are in the same
+directory; so does this. It doesn't matter if you rename the files as long as
+all required files are in the same directory as the one being processed;
+segmenting is based on internal IDs. Depending on how the original files were
+made, you may need to use the C<--fixaudio> and/or C<--fixvideo> options.
 
-By default unlinkmkv will now use the current directory as a default video directory if a file or directory is not given on the command line. This means that if unlinkmkv is set up and on your path, the majority of the time you can simply enter the directory and simply run "unlinkmkv" with no options.
+By default, C<unlinkmkv> will now use the current directory as a default video
+directory if a file or directory is not given on the command line. This means
+that if C<unlinkmkv> is set up and on your path, the majority of the time you
+can simply enter the directory and run C<unlinkmkv> with no options.
 
 Say we have the files:
 
-   princess-ressurection-ep-1.mkv
-   princess-ressurection-clean-opening.mkv
-   princess-ressurection-clean-ending.mkv
+   princess-resurrection-ep-1.mkv
+   princess-resurrection-clean-opening.mkv
+   princess-resurrection-clean-ending.mkv
 
-And "princess-ressurection-ep-1.mkv" links the opening and ending files in the "appropriate places."
+And C<princess-resurrection-ep-1.mkv> links the opening and ending files in the
+"appropriate places."
 
-   unlinkmkv princess-ressurection-ep-1.mkv
+   unlinkmkv princess-resurrection-ep-1.mkv
 
-Doing so will generate a new file under a newly created subdirectory, "./UMKV" by default. The file will be about the total size of the original+external parts. If fixaudio or fixvideo is used, which re-encodes the related parts, about 10% is added to the bitrate by default.
+Doing so will generate a new file under a newly created subdirectory, C<./UMKV>
+by default. The file will be about the total size of the original+external
+parts. If C<--fixaudio> or C<--fixvideo> is used, which re-encodes the related
+parts, about 10% is added to the bitrate by default.
 
-Now, we test the file in a video player. It's important to check for audio or video problems, especially when transitioning between where the segments would have come in. Often times this is the opening/ending and the main show, so seek inside both places and make sure sound is playing in both places, and the video looks fine. Let's
-pretend our sound is totally missing in the main video, and the video is corrupt!
+Now, we test the file in a video player. It's important to check for audio or
+video problems, especially when transitioning between where the segments would
+have come in. Often times this is the opening/ending and the main show, so seek
+inside both places and make sure sound is playing in both places, and the video
+looks fine.
 
-   unlinkmkv --fixaudio --fixvideo princess-ressurection-ep-1.mkv
+Let's pretend our sound is totally missing in the main video, and the video is
+corrupt:
 
-What happens is sometimes encoders use codecs that don't play well with matroska, and can't be assembled as they were -- either the codec (OGG) or the settings (thanks, encoder guy) being the cause. The fixaudio and fixvideo option simply re-encodes the audio and video into a uniform format that plays nice, with settings that try to not reduce the quality very much (not noticable), nor make the files hugemassive. See the FFMPEG notes!
+   unlinkmkv --fixaudio --fixvideo princess-resurrection-ep-1.mkv
+
+What happens is sometimes encoders use codecs that don't play well with
+Matroska, and can't be assembled as they were—either the codec (OGG) or the
+settings (thanks, encoder guy) being the cause. The C<--fixaudio> and
+C<--fixvideo> options simply re-encode the audio and video into a uniform format
+that plays nice, with settings that try not to reduce the quality very much (not
+noticeable), nor make the files hugemassive. See the FFMPEG notes!
 
 You could process them all at once with:
 
@@ -41,17 +71,26 @@ You could process them all at once with:
 
 =head2 INSTALLATION
 
-Clone this repository on linux and macosx, you can also simply "Download zip" on the right; I've heard there is an unofficial package for Arch linux that I'm told works well. For windows
-see the next section. Make sure you meet all the dependencies described in the dependency section.
+Clone this repository on Linux or macOS. You can also simply click "Clone or
+download" E<gt> "Download ZIP" on the top right. I'm also told there is an
+unofficial package for Arch Linux that works well. For Windows, see the next
+section. Make sure you meet all the dependencies described in the dependency
+section.
 
-Configuration is done in a YAML file named unlinkmkv.ini that should exist next to the script. An example file is included named unlinkmkv.ini.dist. Copy this to unlinkmkv.ini and make
-any required changes for your system.
+Configuration is done in a YAML file named C<unlinkmkv.ini> that should exist
+next to the script. An example file is included named C<unlinkmkv.ini.dist>.
+Copy this to C<unlinkmkv.ini> and make any required changes for your system.
 
 =head2 WINDOWS
 
-This script has been updated for cross platform compatibility and currently is tested to work on arch linux, debian, ubuntu, and windows so long as all required dependencies are met. For
-windows an archive exists in the dist/ directory with a compiled version of the script, the required dependencies, and a pre-configured ini to use them -- This distribution is essentially
-a "portable" windows version. After unarchiving either add the new path to your environment PATH variable or simply use an absolute path to it on the command line.
+This script has been updated for cross platform compatibility and currently is
+tested to work on Arch, Debian, Ubuntu, and Windows so long as all required
+dependencies are met. For Windows, an archive exists in the C<dist/> directory
+with a compiled version of the script, the required dependencies, and a pre-
+configured INI file to use them—this distribution is essentially a "portable"
+Windows version. After extracting the archive, either add the new path to your
+environment C<PATH> variable or simply use an absolute path to it on the command
+line.
 
 =head2 DEPENDENCIES
 
@@ -78,10 +117,10 @@ This script requires:
    --fixaudio, -fa        Encode audio, not currently customizable; encodes to 320k AAC for the time being.
    --fixvideo, -fv        Encode video, not currently customizable; encodes to 8-bit h264 at whatever the existing average bitrate was up to 110% higher then that.
    --fixsubtitles, -fs    Defaults to on. Sometimes groups don't use uniform subtitle styles and fonts in all segments, it's a good idea to leave this enabled.
-   --playresx             Occassionally the original encoder uses different subtitle resolutions in the different segments. When combined, it causes problems. This forcibly
+   --playresx             Occasionally the original encoder uses different subtitle resolutions in the different segments. When combined, it causes problems. This forcibly
                           sets the X resolution for subtitle rendering.
    --playresy             Same as above, but for the Y axis (vertical).
-   --ignoredefaultflag    Occassionally the default chapter flag exists, but *all* chapters are disabled which confuses the script. Enable on those rare occassions.
+   --ignoredefaultflag    Occasionally the default chapter flag exists, but *all* chapters are disabled which confuses the script. Enable on those rare occasions.
    --(no-)chapters        The script does its best to adjust the chapters, but it's not quite perfect. This disables including chapters in the final file.
    --ffmpeg [path]        Specify a path to the ffmpeg binary to use.
    --mkvext [path]        Specify a path to the mkvextract binary to use.
@@ -92,7 +131,11 @@ This script requires:
 
 =head2 TEMPLATE
 
-While you can specify a custom template string on the command line, I highly recommend you do so via the ini file instead. Variables can be used in templates with the format {var_MYVAR} and will be replaced with their variable when processed, a couple magic variables will always be provided and custom variables can be set for additional maths.
+While you can specify a custom template string on the command line, I highly
+recommend you do so via the INI file instead. Variables can be used in templates
+with the format C<{var_MYVAR}> and will be replaced with their variable when
+processed. A couple magic variables are always provided, and custom variables
+can be set for additional maths.
 
 Special variables:
 
@@ -100,19 +143,24 @@ Special variables:
    var_size      The size of the original file
    var_duration  The duration of the original file
 
-Variables themselves are defined by prefixing options with "var_" and they themselves can contain other variables and simple math. The current-as-of-this-writing defaults are below:
+Variables themselves are defined by prefixing options with C<var_> and they
+themselves can contain other variables and simple math. The current-as-of-this-
+writing defaults are below:
 
    fixvideotemplate = -c:v libx264 -b:v {var_minrate}k -minrate {var_minrate}k -maxrate {var_maxrate}k -bufsize 1835k -max_muxing_queue_size 4000
    fixaudiotemplate = -map 0 -acodec ac3 -ab 320k
    var_minrate = (var_size * 1.1) / var_duration
    var_maxrate = var_minrate * 2
 
-Which takes the original filesize and multiplies it by 1.1, then devides by duration to get the base and minimum bitrates, then max bitrate is simply the minimum multiplied by two. Feel free to use whatever your version of ffmpeg supports,
-but be mindful that certain codecs don't play well with being joined (OGG Vorbis in particular).
+Which takes the original filesize and multiplies it by 1.1, then divides by
+duration to get the base and minimum bitrates, then max bitrate is simply the
+minimum multiplied by two. Feel free to use whatever your version of ffmpeg
+supports, but be mindful that certain codecs don't play well with being joined
+(OGG Vorbis in particular).
 
 =head2 SUPPORT
 
-Feel free to contact me via Github or by email at g.unlinkmkv -at- idiotb.us.
+Feel free to contact me via GitHub or by email at g.unlinkmkv -at- idiotb.us.
 
 =head2 COPYRIGHT AND LICENSE
 

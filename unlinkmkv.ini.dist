@@ -4,6 +4,7 @@ ffmpeg = /opt/ffmpeg/bin/ffmpeg
 mkvext = /usr/bin/mkvextract
 mkvinfo = /usr/bin/mkvinfo
 mkvmerge = /usr/bin/mkvmerge
+mkvpropedit = /usr/bin/mkvpropedit
 fixaudio = 0
 fixvideo = 0
 fixsubtitles = 1

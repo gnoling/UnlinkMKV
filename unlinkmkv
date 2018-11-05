@@ -13,8 +13,7 @@ use File::Basename;
 use String::CRC32;
 use IPC::Run3;
 use Cwd qw/cwd realpath abs_path/;
-use File::Which;
-qw/which/;
+use File::Which qw/which/;
 use File::Spec::Functions;
 use File::Path qw/mkpath/;
 

@@ -366,6 +366,26 @@ use File::Spec::Functions;
       }
       less();
 
+      INFO "flac check";
+      more();
+      if($self->has_flac($item)) {
+        INFO basename($item) . " has flac, converting to alac temporarily";
+        $self->{flac_items}->{$item} = 1;
+        my $outfile = catfile($self->{tmpdir}, basename($item)."-alac.mkv");
+        $self->sys($self->{opt}->{ffmpeg}, '-i', $item, '-vcodec', 'copy', '-map', '0', '-acodec', 'alac', $outfile);
+        $item = $outfile;
+      }
+      for (my $i = 0; $i <= $#segments; $i++) {
+        if($self->has_flac($segments[$i]->{file})) {
+          INFO basename($segments[$i]->{file}) . " has flac, converting to alac temporarily";
+          $self->{flac_items}->{$segments[$i]->{file}} = 1;
+          my $outfile = catfile($self->{tmpdir}, basename($segments[$i]->{file})."-alac.mkv");
+          $self->sys($self->{opt}->{ffmpeg}, '-i', $segments[$i]->{file}, '-vcodec', 'copy', '-map', '0', '-acodec', 'alac', $outfile) unless -f $outfile;
+          $segments[$i]->{file} = $outfile;
+        }
+      }
+      less();
+
 			more();
       my @meta;
       my $metaid;
@@ -670,11 +690,23 @@ use File::Spec::Functions;
         less();
       }
 
+      
+      if(defined $self->{flac_items} && -f catfile($self->{encodesdir}, basename($item))) {
+        INFO "encoding back to flac";
+        more();
+        my $file = catfile($self->{encodesdir}, basename($item));
+        (my $final = catfile($self->{encodesdir}, basename($item))) =~ s/-alac\.mkv$//;
+        $self->sys($self->{opt}->{ffmpeg}, '-i', $file, '-vcodec', 'copy', '-map', '0', '-acodec', 'flac', $final);
+        $self->replace($file, $final);
+        less();
+      }
+
       INFO "moving built file to final destination";
       more();
       if(-f catfile($self->{encodesdir}, basename($item))) {
         make_path($self->{opt}->{outdir}, { verbose => 0 });
-        move(catfile($self->{encodesdir}, basename($item)), $self->{opt}->{outdir});
+        (my $final = catfile($self->{opt}->{outdir}, basename($item))) =~ s/-alac\.mkv$//;
+        move(catfile($self->{encodesdir}, basename($item)), $final);
       }
       else {
         WARN "file failed to build";
@@ -918,6 +950,18 @@ use File::Spec::Functions;
     }
     $th += $dh;
     return sprintf("%02d:%02d:%02.9f", $th, $tm, $ts);
+  }
+
+  sub has_flac {
+    my $self = shift;
+    my $item = shift;
+    my $flac = 0;
+    foreach my $LINE (split /\n/, $self->sys($self->{opt}->{mkvinfo}, $item)) {
+      if(defined $LINE && $LINE =~ /Codec ID: A_FLAC/) {
+        $flac = 1;
+      }
+    }
+    return $flac;
   }
 
   sub sys {

@@ -820,7 +820,9 @@ use File::Spec::Functions;
       while (my $line = <$F>) {
 
         if($line =~ /^\[/ && $line =~ /^\[V4\+ Styles/) {
-          $in = 1;
+          $in  = 1;
+          $di  = 0;
+          $key = undef;
         }
         elsif(($in || $di)&& !defined $key && $line =~ /^Format:/i) {
           my $test = "$line";

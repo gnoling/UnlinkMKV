@@ -222,7 +222,7 @@ use File::Spec::Functions;
       my ($parent, $dir, $suffix)= fileparse($item, qr/\.[mM][kK][vV]/);
       INFO "loading chapters";
       more();
-      my $xml = $self->{xml}->load_xml(string => $self->sys($self->{opt}->{mkvext}, 'chapters', $item));
+      my $xml = $self->{xml}->load_xml(string => $self->sys($self->{opt}->{mkvext}, '--ui-language', 'en_US', 'chapters', $item));
       open my $out_chapters_orig, '>', catfile($self->{tmpdir}, "$parent-chapters-original.xml");
       print {$out_chapters_orig} $xml->toString;
       close $out_chapters_orig;
@@ -393,7 +393,7 @@ use File::Spec::Functions;
       {
         my $in   = 0;
         my ($NAME, $TYPE, $LANG, $ID, $DEF);
-        foreach my $LINE (split /\n/, $self->sys($self->{opt}->{mkvinfo}, $item)) {
+        foreach my $LINE (split /\n/, $self->sys($self->{opt}->{mkvinfo}, '--ui-language', 'en_US', $item)) {
           chomp $LINE;
           if($LINE =~ /^\| ?\+/) {
             $in = 0;
@@ -452,7 +452,7 @@ use File::Spec::Functions;
         my $in   = 0;
         my ($N, $T, $D, $U);
         TRACE "FILE $file";
-        for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, $file)) {
+        for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, '--ui-language', 'en_US', $file)) {
           chomp;
           if($_ =~ /\|[\s\t]+\+[\s\t]+Attached/i) {
             $in = 1;
@@ -491,7 +491,7 @@ use File::Spec::Functions;
           my $dir = cwd();
           TRACE "chdir $self->{attachdir}";
           chdir($self->{attachdir});
-          $self->sys($self->{opt}->{mkvext}, 'attachments', $file, (1 .. $#{ $seg->{attachments} } + 1));
+          $self->sys($self->{opt}->{mkvext}, '--ui-language', 'en_US', 'attachments', $file, (1 .. $#{ $seg->{attachments} } + 1));
           chdir($dir);
         }
       }
@@ -510,7 +510,7 @@ use File::Spec::Functions;
       more();
       if(scalar(@splits) > 0) {
         INFO "creating " . scalar(@splits + 1). " splits from $item";
-        $self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-o', catfile($self->{partsdir}, "split-%03d.mkv"), $item, '--split', 'timecodes:' . join(',', @splits));
+        $self->sys($self->{opt}->{mkvmerge}, '--ui-language', 'en_US', '--no-chapters', '-o', catfile($self->{partsdir}, "split-%03d.mkv"), $item, '--split', 'timecodes:' . join(',', @splits));
       }
       less();
 
@@ -542,7 +542,7 @@ use File::Spec::Functions;
           my $in  = 0;
           my $sub = 0;
           my ($N, $T, $D, $U);
-          for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, $part)) {
+          for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, '--ui-language', 'en_US', $part)) {
             chomp;
             if($_ =~ /^\| \+ A track/ || $_ =~ /^\| \+ Track/) {
               $in = 1;
@@ -560,7 +560,7 @@ use File::Spec::Functions;
             }
             if(defined $in && $sub && $T) {
               my $sf = catfile($self->{subtitlesdir}, basename($part) . "-$T.ass");
-              $self->sys($self->{opt}->{mkvext}, 'tracks', $part, "$T:$sf");
+              $self->sys($self->{opt}->{mkvext}, '--ui-language', 'en_US', 'tracks', $part, "$T:$sf");
               push @{ $subs->{$part} }, $sf;
               undef $T;
               $in  = 0;
@@ -593,7 +593,7 @@ use File::Spec::Functions;
           foreach my $T (@{ $subs->{$f} }) {
             push @stracks, $T;
           }
-          $self->sys($self->{opt}->{mkvmerge}, '-o', "$f-fixsubs.mkv", '--no-chapters', '--no-subs', $f, @stracks, @atts);
+          $self->sys($self->{opt}->{mkvmerge}, '--ui-language', 'en_US', '-o', "$f-fixsubs.mkv", '--no-chapters', '--no-subs', $f, @stracks, @atts);
           $self->replace($f, "$f-fixsubs.mkv");
         }
         less();
@@ -638,10 +638,10 @@ use File::Spec::Functions;
       }
       pop @PRTS;
       if($self->{opt}->{chapters}) {
-        $self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', catfile($self->{tmpdir}, "$parent-chapters.xml" ), '-o', catfile( $self->{encodesdir}, basename($item) ), @PRTS);
+        $self->sys($self->{opt}->{mkvmerge}, '--ui-language', 'en_US', '--no-chapters', '-M', '--chapters', catfile($self->{tmpdir}, "$parent-chapters.xml" ), '-o', catfile( $self->{encodesdir}, basename($item) ), @PRTS);
       }
       else {
-        $self->sys($self->{opt}->{mkvmerge}, '--no-chapters', '-M', '--chapters', catfile($self->{tmpdir}, "$parent-chapters.xml" ), '-o', catfile( $self->{encodesdir}, basename($item) ), @PRTS);
+        $self->sys($self->{opt}->{mkvmerge}, '--ui-language', 'en_US', '--no-chapters', '-M', '--chapters', catfile($self->{tmpdir}, "$parent-chapters.xml" ), '-o', catfile( $self->{encodesdir}, basename($item) ), @PRTS);
       }
       less();
 
@@ -652,7 +652,7 @@ use File::Spec::Functions;
         my $in  = 0;
         my $sub = 0;
         my ($N, $T, $D, $U);
-        for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, catfile($self->{encodesdir}, basename($item)))) {
+        for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, '--ui-language', 'en_US', catfile($self->{encodesdir}, basename($item)))) {
           chomp;
           if($_ =~ /^\| \+ A track/ || $_ =~ /^\| \+ Track/) {
             $in = 1;
@@ -669,14 +669,14 @@ use File::Spec::Functions;
             $T = $1;
           }
           if(defined $in && $sub && $T) {
-            $self->sys($self->{opt}->{mkvext}, 'tracks', catfile($self->{encodesdir}, basename($item)), "$T:" . catfile($self->{encodesdir}, "$T.ass"));
+            $self->sys($self->{opt}->{mkvext}, '--ui-language', 'en_US', 'tracks', catfile($self->{encodesdir}, basename($item)), "$T:" . catfile($self->{encodesdir}, "$T.ass"));
             push @FS, catfile($self->{encodesdir}, "$T.ass");
             undef $T;
             $in  = 0;
             $sub = 0;
           }
         }
-        $self->sys($self->{opt}->{mkvmerge}, '-o', catfile($self->{encodesdir}, "fixed." . basename($item) ), '-S', catfile( $self->{encodesdir}, basename($item) ), @FS);
+        $self->sys($self->{opt}->{mkvmerge}, '--ui-language', 'en_US', '-o', catfile($self->{encodesdir}, "fixed." . basename($item) ), '-S', catfile( $self->{encodesdir}, basename($item) ), @FS);
         $self->replace(catfile($self->{encodesdir}, basename($item)), catfile($self->{encodesdir}, "fixed." . basename($item)));
       }
       less();
@@ -685,7 +685,7 @@ use File::Spec::Functions;
         INFO "applying metadata";
         more();
         foreach my $M (@meta) {
-          $self->sys($self->{opt}->{mkvpropedit}, @$M, catfile($self->{encodesdir}, basename($item)));
+          $self->sys($self->{opt}->{mkvpropedit}, '--ui-language', 'en_US', @$M, catfile($self->{encodesdir}, basename($item)));
         }
         less();
       }
@@ -780,7 +780,7 @@ use File::Spec::Functions;
     my $item   = shift;
     my $linked = 0;
     more();
-    foreach my $line (split /\n/, $self->sys($self->{opt}->{mkvext}, 'chapters', $item)) {
+    foreach my $line (split /\n/, $self->sys($self->{opt}->{mkvext}, '--ui-language', 'en_US', 'chapters', $item)) {
       if($line =~ /<ChapterSegmentUID/i) {
         $linked = 1;
       }
@@ -918,7 +918,7 @@ use File::Spec::Functions;
     my $file = shift;
     my $id   = '';
     my $dur  = '';
-    for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, $file)) {
+    for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, '--ui-language', 'en_US', $file)) {
       chomp;
       if($_ =~ /Segment[ \-]UID:/) {
         $_ =~ /Segment[ \-]UID:([a-zA-Z0-9\s]+)$/;
@@ -958,7 +958,7 @@ use File::Spec::Functions;
     my $self = shift;
     my $item = shift;
     my $flac = 0;
-    foreach my $LINE (split /\n/, $self->sys($self->{opt}->{mkvinfo}, $item)) {
+    foreach my $LINE (split /\n/, $self->sys($self->{opt}->{mkvinfo}, '--ui-language', 'en_US', $item)) {
       if(defined $LINE && $LINE =~ /Codec ID: A_FLAC/) {
         $flac = 1;
       }

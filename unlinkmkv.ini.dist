@@ -14,3 +14,5 @@ fixvideotemplate = -c:v libx264 -b:v {var_minrate}k -minrate {var_minrate}k -max
 fixaudiotemplate = -map 0 -acodec ac3 -ab 320k
 var_minrate = (var_size * 1.1) / var_duration
 var_maxrate = var_minrate * 2
+locale = en_US
+

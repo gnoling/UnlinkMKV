@@ -99,10 +99,10 @@ use File::Path qw/mkpath/;
   );
 
   $opt->{outdir}   = canonpath($opt->{outdir});
-  $opt->{ffmpeg}   = canonpath(abs_path(which $opt->{ffmpeg}));
-  $opt->{mkvext}   = canonpath(abs_path(which $opt->{mkvext}));
-  $opt->{mkvinfo}  = canonpath(abs_path(which $opt->{mkvinfo}));
-  $opt->{mkvmerge} = canonpath(abs_path(which $opt->{mkvmerge}));
+  $opt->{ffmpeg}   = canonpath(abs_path((which $opt->{ffmpeg})[0]));
+  $opt->{mkvext}   = canonpath(abs_path((which $opt->{mkvext})[0]));
+  $opt->{mkvinfo}  = canonpath(abs_path((which $opt->{mkvinfo})[0]));
+  $opt->{mkvmerge} = canonpath(abs_path((which $opt->{mkvmerge})[0]));
   $opt->{tmpdir}   = canonpath($opt->{tmpdir});
 
   UnlinkMKV::more();

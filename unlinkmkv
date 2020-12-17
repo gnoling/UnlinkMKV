@@ -642,7 +642,7 @@ use File::Spec::Functions;
         $self->sys($self->{opt}->{mkvmerge}, '--ui-language', $self->{opt}->{locale}, '--no-chapters', '-M', '--chapters', catfile($self->{tmpdir}, "$parent-chapters.xml" ), '-o', catfile( $self->{encodesdir}, basename($item) ), @PRTS);
       }
       else {
-        $self->sys($self->{opt}->{mkvmerge}, '--ui-language', $self->{opt}->{locale}, '--no-chapters', '-M', '--chapters', catfile($self->{tmpdir}, "$parent-chapters.xml" ), '-o', catfile( $self->{encodesdir}, basename($item) ), @PRTS);
+        $self->sys($self->{opt}->{mkvmerge}, '--ui-language', $self->{opt}->{locale}, '--no-chapters', '-M', '-o', catfile( $self->{encodesdir}, basename($item) ), @PRTS);
       }
       less();
 

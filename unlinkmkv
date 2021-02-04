@@ -154,6 +154,9 @@ use Cwd qw/cwd realpath abs_path/;
 use File::Path qw/make_path rmtree/;
 use File::Copy;
 use File::Spec::Functions;
+use JSON;
+use Time::Piece;
+use Time::Seconds;
 
   sub new {
     my $type   = shift;
@@ -257,11 +260,12 @@ use File::Spec::Functions;
           if($SegmentELE->getAttribute('format') eq 'hex') {
             $SegmentUIDText =~ s/\n//g;
             $SegmentUIDText =~ s/\s//g;
-            $SegmentUIDText =~ s/([a-zA-Z0-9]{2})/ 0x$1/g;
+            #$SegmentUIDText =~ s/([a-zA-Z0-9]{2})/ 0x$1/g;
             $SegmentUIDText =~ s/^\s//;
           }
           elsif($SegmentELE->getAttribute('format') eq 'ascii') {
-            $SegmentUIDText =~ s/(.)/sprintf("0x%x ",ord($1))/eg;
+            #$SegmentUIDText =~ s/(.)/sprintf("0x%x ",ord($1))/eg;
+            $SegmentUIDText =~ s/(.)/sprintf("%xg",ord($1))/eg;
             $SegmentUIDText =~ s/\s$//;
           }
           push @segments, {
@@ -917,22 +921,18 @@ use File::Spec::Functions;
   sub mkvinfo {
     my $self = shift;
     my $file = shift;
-    my $id   = '';
-    my $dur  = '';
-    for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, '--ui-language', $self->{opt}->{locale}, $file)) {
-      chomp;
-      if($_ =~ /Segment[ \-]UID:/) {
-        $_ =~ /Segment[ \-]UID:([a-zA-Z0-9\s]+)$/;
-        $id = $1;
-        $id =~ s/^\s+//g;
-        $id =~ s/\s+$//g;
-      }
-      elsif($_ =~ /^\| \+ Duration:/) {
-        $_ =~ /^\| \+ Duration:.*\((.*)\)/;
-        $dur = $1;
-      }
-    }
-    return ($id, $dur);
+    my $info = decode_json($self->sys($self->{opt}->{mkvmerge}, '-F', 'json', '--identify', $file));
+    my $val  = Time::Seconds->new($info->{container}->{properties}->{duration}/1e9);
+    return ($info->{container}->{properties}->{segment_uid}, ts_timecode($val));
+  }
+
+  sub ts_timecode {
+    my $s = shift;
+    my $hours = sprintf("%02d", $s->hours);   $s -= ($hours * 3600);
+    my $mins  = sprintf("%02d", $s->minutes); $s -= ($mins * 60);
+    my $sec   = sprintf("%02d", $s->seconds);
+    my $str   = "$hours:$mins:$sec";
+    return $str;
   }
 
   sub add_duration_to_timecode {

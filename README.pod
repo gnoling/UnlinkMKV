@@ -13,10 +13,6 @@ segments as chapters in each episode's individual MKV. The problem is that very
 few players/filters/splitters support this, so this script automates the
 mkvtoolnix tools to "rebuild" each episode into "complete" MKVs.
 
-=head2 VERSION
-
-version 1.01
-
 =head2 SYNOPSIS
 
 When using C<unlinkmkv> to unlink segments, the chapters when viewing the video
@@ -161,13 +157,13 @@ supports, but be mindful that certain codecs don't play well with being joined
 
 =head2 SUPPORT
 
-Feel free to contact me via GitHub or by email at g.unlinkmkv -at- idiotb.us.
+Feel free to contact me via GitHub or by email at garret -at- wrjb.cc.
 
 =head2 COPYRIGHT AND LICENSE
 
 MIT License
 
-Copyright (c) 2016-2017 Garret C. Noling
+Copyright (c) 2016-2022 Garret C. Noling
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

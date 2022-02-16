@@ -6,7 +6,7 @@ require 5.010;
 use strict;
 use XML::LibXML;
 use File::Glob qw/:globally :nocase/;
-use Math::BigFloat qw/:constant/;
+use Math::BigFloat;
 use Getopt::Long qw/:config passthrough/;
 use Log::Log4perl qw/:easy/;
 use File::Basename;
@@ -68,7 +68,7 @@ use File::Path qw/mkpath/;
         my $val = $2;
         $val =~ s/\$basedir/$basedir/g;
         DEBUG "[ini] [$key] = [$val]";
-        $opt->{$key} = $val;
+        $opt->{$key} = ($val =~ /^\d+$/) ? int($val) : $val;
       }
       else {
         TRACE "[ini] skipping line [$line]";
@@ -941,9 +941,15 @@ use Time::Seconds;
     my $dur  = shift;
     my ($th, $tm, $ts)= split /:/, $time;
     my ($dh, $dm, $ds)= split /:/, $dur;
-    $ts += ($ds + 0.000000001);
-    if($ts >= 60.000000000) {
-      $ts = $ts - 60.000000000;
+    $ts = Math::BigFloat->new("$ts");
+    $ds = Math::BigFloat->new("$ds");
+    my $small = Math::BigFloat->new("0.000000001");
+    my $sixty = Math::BigFloat->new("60.000000000");
+    my $ds_small = $ds->copy();
+    $ds_small->badd($small);
+    $ts->badd($ds_small);
+    if($ts->bge($sixty)) {
+      $ts->bsub($sixty);
       $dm++;
     }
     $tm += $dm;

@@ -97,6 +97,7 @@ This script requires:
    XML::LibXML >= 2.0001
    IPC::Run3
    File::Which
+   JSON
    String::CRC32
    Log::Log4perl
    Math::BigFloat

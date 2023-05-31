@@ -17,15 +17,18 @@ use File::Which qw/which/;
 use File::Spec::Functions;
 use File::Path qw/mkpath/;
 
-  my $loglevel = 'INFO';
+  my $loglevel  = 'INFO';
+  my $logcolors = 0;
   GetOptions(
     'll|loglevel=s' => \$loglevel,
+    'colors!' => \$logcolors,
   );
+  my $logdriver = ($logcolors) ? 'Log::Log4perl::Appender::ScreenColoredLevels' : 'Log::Log4perl::Appender::Screen';
 
   $loglevel = uc($loglevel);
   my $conf = qq(
     log4perl.logger                   = $loglevel, STDINF
-    log4perl.appender.STDINF          = Log::Log4perl::Appender::Screen
+    log4perl.appender.STDINF          = $logdriver
     log4perl.appender.STDINF.stderr   = 0
     log4perl.appender.STDINF.layout   = PatternLayout
     log4perl.appender.STDINF.layout.ConversionPattern = %x%m{chomp}%n
@@ -71,7 +74,7 @@ use File::Path qw/mkpath/;
         $opt->{$key} = ($val =~ /^\d+$/) ? int($val) : $val;
       }
       else {
-        TRACE "[ini] skipping line [$line]";
+        DEBUG "[ini] skipping line [$line]";
       }
     }
     close $F;
@@ -105,13 +108,11 @@ use File::Path qw/mkpath/;
   $opt->{mkvmerge} = canonpath(abs_path((which $opt->{mkvmerge})[0]));
   $opt->{tmpdir}   = canonpath($opt->{tmpdir});
 
-  UnlinkMKV::more();
   INFO "Options";
   UnlinkMKV::more();
   foreach my $key (sort keys %$opt) {
     INFO "$key: $opt->{$key}";
   }
-  UnlinkMKV::less();
   UnlinkMKV::less();
 
   my $UMKV = UnlinkMKV->new($opt);
@@ -327,9 +328,11 @@ use Time::Seconds;
       }
 
       INFO "writing chapter temporary file";
+      more();
       open my $out_chapters, '>', catfile($self->{tmpdir}, "$parent-chapters.xml");
       print {$out_chapters} $xml->toString;
       close $out_chapters;
+      less();
 
       INFO "looking for segment parts";
       more();
@@ -352,8 +355,8 @@ use Time::Seconds;
       }
       less();
 
-      more();
       INFO "checking that all required segments were found";
+      more();
       my $okay_to_proceed = 1;
       for (@segments) {
         if(defined $_->{id} && !defined $_->{file}) {
@@ -391,7 +394,6 @@ use Time::Seconds;
       }
       less();
 
-			more();
       my @meta;
       my $metaid;
 			INFO "reading metadata";
@@ -448,15 +450,15 @@ use Time::Seconds;
           }
         }
       }
-			less();
 
-      INFO "extracting attachments";
+      INFO "searching attachments";
       more();
       foreach my $seg (@segments) {
         my $file = "$seg->{file}";
         my $in   = 0;
         my ($N, $T, $D, $U);
-        TRACE "FILE $file";
+        INFO "$file";
+        more();
         for (split /\n/, $self->sys($self->{opt}->{mkvinfo}, '--ui-language', $self->{opt}->{locale}, $file)) {
           chomp;
           if($_ =~ /\|[\s\t]+\+[\s\t]+Attached/i) {
@@ -483,7 +485,7 @@ use Time::Seconds;
               INFO "found $N";
             }
             else {
-              DEBUG "skipping $N";
+              INFO "skipping (duplicate) $N";
             }
             undef $N;
             undef $T;
@@ -494,11 +496,11 @@ use Time::Seconds;
         if(defined $seg->{attachments} && @{ $seg->{attachments} } > 0) {
           INFO "extracting attachments...";
           my $dir = cwd();
-          TRACE "chdir $self->{attachdir}";
           chdir($self->{attachdir});
           $self->sys($self->{opt}->{mkvext}, '--ui-language', $self->{opt}->{locale}, 'attachments', $file, (1 .. $#{ $seg->{attachments} } + 1));
           chdir($dir);
         }
+        less();
       }
       less();
 
@@ -512,12 +514,12 @@ use Time::Seconds;
       }
       closedir $D;
 
-      more();
       if(scalar(@splits) > 0) {
         INFO "creating " . scalar(@splits + 1). " splits from $item";
+        more();
         $self->sys($self->{opt}->{mkvmerge}, '--ui-language', $self->{opt}->{locale}, '--no-chapters', '-o', catfile($self->{partsdir}, "split-%03d.mkv"), $item, '--split', 'timecodes:' . join(',', @splits));
+        less();
       }
-      less();
 
       INFO "setting parts";
       more();
@@ -722,6 +724,12 @@ use Time::Seconds;
     less();
   }
 
+  sub softfail {
+    my $self = shift;
+    $self->mktmp() if $self->{opt}->{cleanup};
+    less();
+  }
+
   sub parseoptvars {
     my $self = shift;
     my $vars = shift;
@@ -791,10 +799,10 @@ use Time::Seconds;
       }
     }
     if ($linked) {
-      WARN "file contains segmented chapters";
+      INFO "file contains segmented chapters";
     }
     else {
-      INFO "file does not contain segmented chapters";
+      DEBUG "file does not contain segmented chapters";
     }
     less();
     return $linked;
@@ -977,7 +985,6 @@ use Time::Seconds;
     my $self = shift;
     my @app  = @_;
     my $buf;
-    more();
     TRACE "sys > @app";
     run3(
       \@app,
@@ -992,16 +999,16 @@ use Time::Seconds;
         TRACE "sys !! $line";
         $buf .= $line;
       } );
-    less();
     return $buf;
   }
 
   sub more {
-    Log::Log4perl::NDC->push("  ");
+    Log::Log4perl::NDC->push(" ");
   }
 
   sub less {
     Log::Log4perl::NDC->pop();
+    print "\n";
   }
 
 }

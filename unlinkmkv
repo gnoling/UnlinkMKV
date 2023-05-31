@@ -54,6 +54,7 @@ use File::Path qw/mkpath/;
   $opt->{fixvideo}          = 0;
   $opt->{fixsubtitles}      = 1;
   $opt->{ignoredefaultflag} = 0;
+  $opt->{ignoresegmentstart} = 0;
   $opt->{chapters}          = 1;
   $opt->{cleanup}           = 1;
   $opt->{fixvideotemplate}  = '-c:v libx264 -b:v %br%k -minrate %br%k -maxrate %br2%k -bufsize 1835k';
@@ -89,7 +90,8 @@ use File::Path qw/mkpath/;
     'outdir=s',
     'playresx=i',
     'playresy=i',
-    'ignoredefaultflag',
+    'ignoredefaultflag!',
+    'ignoresegmentstart!',
     'chapters!',
     'ffmpeg=s',
     'mkvext=s',
@@ -526,7 +528,7 @@ use Time::Seconds;
       my (@parts, $LAST);
       my $count = 1;
       foreach my $segment (@segments) {
-        if(defined $segment->{id} && $segment->{start} =~ /^00:00:00\./ || ($LAST ne $segment->{file} && scalar(@splits) == 0)) {
+        if(defined $segment->{id} && ($self->{opt}->{ignoresegmentstart} || $segment->{start} =~ /^00:00:00\./) || ($LAST ne $segment->{file} && scalar(@splits) == 0)) {
           DEBUG "part $segment->{file}";
           push @parts, $segment->{file};
         }
